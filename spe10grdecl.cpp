@@ -168,7 +168,7 @@ int main(int argc, char *argv[])
 	if (argc < 2)
 	{
 		std::cout << "Usage: " << argv[0] ;
-		std::cout << " output.grdecl" << std::endl;
+		std::cout << " output.grdecl [lnx=0 rnx=60 lny=0 rny=220 lnz=0 rnz=85]" << std::endl;
 		return -1;
 	}
 
@@ -184,22 +184,32 @@ int main(int argc, char *argv[])
 	
 	double value, ztop, zbottom, xyz[3], xyzout[3], nrmtop[3], nrmbottom[3], nrm[3], Kin[3], Kout[6];
 	double max[3] = {240,440,340}, min[3] = {0,0,0};
-	int nx = 60, ny = 220, nz = 85, nout = 0;
+	int nx = 60, ny = 220, nz = 85, nout = 0, m;
+	int lnx = 0, lny = 0, lnz = 0;
+	int rnx = nx, rny = ny, rnz = nz;
+	
+	if( argc > 2 ) lnx = atoi(argv[2]);
+	if( argc > 3 ) rnx = atoi(argv[3]);
+	if( argc > 4 ) lny = atoi(argv[4]);
+	if( argc > 5 ) rny = atoi(argv[5]);
+	if( argc > 6 ) lnz = atoi(argv[6]);
+	if( argc > 7 ) rnz = atoi(argv[7]);
+	std::cout << "intervals x " << lnx << ":" << rnx << " y " << lny << ":" << rny << " " << lnz << ":" << rnz << std::endl;
   
 	std::cout << "Writing grid data." << std::endl;
 	
 	f << "DIMENS" << std::endl;
-	f << nx << " " << ny << " " << nz << std::endl;
+	f << rnx-lnx << " " << rny-lny << " " << rnz-lnz << std::endl;
 	f << "/" << std::endl;
 	
 	f << "SPECGRID" << std::endl;
-	f << nx << " " << ny << " " << nz << " " << 1 << " " << 'P' << std::endl;
+	f << rnx-lnx << " " << rny-lny << " " << rnz-lnz << " " << 1 << " " << 'P' << std::endl;
 	f << "/" << std::endl;
 	
 	f << "COORD" << std::endl;
-	for(int j = 0; j <= ny; ++j)
+	for(int j = lny; j <= rny; ++j)
 	{
-		for(int i = 0; i <= nx; ++i)
+		for(int i = lnx; i <= rnx; ++i)
 		{
 			//bottom point
 			xyz[0] = 240.0 * i / 60.0;
@@ -223,15 +233,15 @@ int main(int argc, char *argv[])
 	
 	f << "ZCORN" << std::endl;
 	nout = 0;
-	for(int k = 0; k < nz; ++k)
+	for(int k = lnz; k < rnz; ++k)
 	{
 		//top corners
 		xyz[2] = 340.0 * k / 85.0;
-		for(int j = 0; j < ny; ++j)
+		for(int j = lny; j < rny; ++j)
 		{
 			xyz[1] = 440.0 * j / 220.0;
 			//top corners, near left and near right
-			for(int i = 0; i < nx; ++i)
+			for(int i = lnx; i < rnx; ++i)
 			{
 				//top near left corner
 				xyz[0] = 240.0 * i / 60.0;
@@ -249,7 +259,7 @@ int main(int argc, char *argv[])
 			}
 			xyz[1] = 440.0 * (j+1) / 220.0;
 			//top corners, far left and far right
-			for(int i = 0; i < nx; ++i)
+			for(int i = lnx; i < rnx; ++i)
 			{
 				// top far left corner
 				xyz[0] = 240.0 * i / 60.0;
@@ -268,11 +278,11 @@ int main(int argc, char *argv[])
 		}
 		xyz[2] = 340.0 * (k+1) / 85.0;
 		//bottom corners 
-		for(int j = 0; j < ny; ++j)
+		for(int j = lny; j < rny; ++j)
 		{
 			xyz[1] = 440.0 * j / 220.0;
 			//top corners, near left and near right
-			for(int i = 0; i < nx; ++i)
+			for(int i = lnx; i < rnx; ++i)
 			{
 				//bottom near left corner
 				xyz[0] = 240.0 * i / 60.0;
@@ -290,7 +300,7 @@ int main(int argc, char *argv[])
 			}
 			xyz[1] = 440.0 * (j+1) / 220.0;
 			//top corners, far left and far right
-			for(int i = 0; i < nx; ++i)
+			for(int i = lnx; i < rnx; ++i)
 			{
 				//bottom far left corner
 				xyz[0] = 240.0 * i / 60.0;
@@ -332,10 +342,15 @@ int main(int argc, char *argv[])
 				for(int i = 0; i < nx; ++i)
 				{
 					fporo >> value;
-					f << value << " ";
-					nout++;
-					if( nout % 10 == 0 ) 
-						f << std::endl;
+					if( i >= lnx && i < rnx &&
+						j >= lny && j < rny &&
+						k >= lnz && k < rnz )
+					{
+						f << value << " ";
+						nout++;
+						if( nout % 10 == 0 ) 
+							f << std::endl;
+					}
 				}
 			}
 		}
@@ -383,19 +398,26 @@ int main(int argc, char *argv[])
 			{
 				for(int i = 0; i < nx; ++i)
 				{
-					xyz[0] = 240.0 * (i+0.5) / 60.0;
-					xyz[1] = 440.0 * (j+0.5) / 220.0;
-					xyz[2] = 340.0 * (k+0.5) / 85.0;
-					Kin[0] = perm[0][nout];
-					Kin[1] = perm[1][nout];
-					Kin[2] = perm[2][nout];
+					if( i >= lnx && i < rnx &&
+						j >= lny && j < rny &&
+						k >= lnz && k < rnz )
+					{
+						xyz[0] = 240.0 * (i+0.5) / 60.0;
+						xyz[1] = 440.0 * (j+0.5) / 220.0;
+						xyz[2] = 340.0 * (k+0.5) / 85.0;
+						Kin[0] = perm[0][nout];
+						Kin[1] = perm[1][nout];
+						Kin[2] = perm[2][nout];
+						transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+						for(int l = 0; l < 3; ++l)
+							nrm[l] = (nrmtop[l]-nrmbottom[l])*(xyz[2]-min[2])/(max[2]-min[2]) + nrmbottom[l];
+						rotate_tensor(nrm,Kin,Kout);
+						for(int l = 0; l < 6; ++l)
+							permnew[l].push_back(Kout[l]);
+					}
+					else for(int l = 0; l < 6; ++l)
+						permnew[l].push_back(0.0);
 					nout++;
-					transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
-					for(int l = 0; l < 3; ++l)
-						nrm[l] = (nrmtop[l]-nrmbottom[l])*(xyz[2]-min[2])/(max[2]-min[2]) + nrmbottom[l];
-					rotate_tensor(nrm,Kin,Kout);
-					for(int l = 0; l < 6; ++l)
-						permnew[l].push_back(Kout[l]);
 				}
 			}
 		}
@@ -408,17 +430,23 @@ int main(int argc, char *argv[])
 		for(int l = 0; l < 6; ++l)
 		{
 			f << "PERM" << c1[l] << c2[l] << std::endl;
-			nout = 0;
+			m = nout = 0;
 			for(int k = 0; k < nz; ++k)
 			{
 				for(int j = 0; j < ny; ++j)
 				{
 					for(int i = 0; i < nx; ++i)
 					{
-						f << permnew[l][nout] << " ";
-						nout++;
-						if( nout % 10 == 0 ) 
-							f << std::endl;
+						if( i >= lnx && i < rnx &&
+							j >= lny && j < rny &&
+							k >= lnz && k < rnz )
+						{
+							f << permnew[l][m] << " ";
+							nout++;
+							if( nout % 10 == 0 ) 
+								f << std::endl;
+						}
+						m++;
 					}
 				}
 			}
