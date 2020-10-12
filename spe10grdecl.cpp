@@ -2,6 +2,7 @@
 #include <fstream>
 #include <cmath>
 #include <vector>
+#include <limits>
 
 
 const double pi = 3.14159265359;
@@ -18,8 +19,95 @@ void normalize(double n[3])
 	}
 }
 
+const double noind = std::numeric_limits<double>::quiet_NaN();
+int N = 128;
+#define ind(r,c) ((r)*N + (c))
+std::vector<double> map;
 
-void transform(double xyz[3], double max[3], double min[3], double & ztop, double & zbottom, double nrmtop[3], double nrmbottom[3])
+void rand2d(double * arr, int N, int Nl, int Nr, int Nb, int Nt, double t)
+{
+	//std::cout << "Nl:Nr " << Nl <<":" << Nr << " Nb:Nt " << Nb << ":" << Nt << std::endl;
+	if(  Nr - Nl < 2 && Nt - Nb < 2 ) 
+	{
+		//std::cout << "exit" << std::endl;
+		return;
+	}
+	//const double t = 0.15;
+	int Nk = (Nb+Nt)/2;
+	int Nm = (Nl+Nr)/2;
+	//std::cout << "Nk " << Nk << " Nm " << Nm << std::endl;
+	double lb = arr[ind(Nb,Nl)];
+	double rb = arr[ind(Nb,Nr)];
+	double lt = arr[ind(Nt,Nl)];
+	double rt = arr[ind(Nt,Nr)];
+	if( lb != lb || rb != rb || lt != lt || rt != rt ) throw -1;
+	if( arr[ind(Nk,Nl)] != arr[ind(Nk,Nl)] ) arr[ind(Nk,Nl)] = 0.5*(lb + lt) + (2*(rand()*1.0/RAND_MAX)-1)*t;
+	if( arr[ind(Nk,Nr)] != arr[ind(Nk,Nr)] ) arr[ind(Nk,Nr)] = 0.5*(rb + rt) + (2*(rand()*1.0/RAND_MAX)-1)*t;
+	if( arr[ind(Nb,Nm)] != arr[ind(Nb,Nm)] ) arr[ind(Nb,Nm)] = 0.5*(lb + rb) + (2*(rand()*1.0/RAND_MAX)-1)*t;
+	if( arr[ind(Nt,Nm)] != arr[ind(Nt,Nm)] ) arr[ind(Nt,Nm)] = 0.5*(lt + rt) + (2*(rand()*1.0/RAND_MAX)-1)*t;
+	arr[ind(Nk,Nm)] = 0.25*(lb+rb+lt+rt) + (2*(rand()*1.0/RAND_MAX)-1)*t;
+	rand2d(arr,N,Nl,Nm,Nb,Nk,t*0.5); rand2d(arr,N,Nm,Nr,Nb,Nk,t*0.5);
+	rand2d(arr,N,Nl,Nm,Nk,Nt,t*0.5); rand2d(arr,N,Nm,Nr,Nk,Nt,t*0.5);
+}
+
+void init2d(double * arr, int N, double mint, double maxt)
+{
+	for(int k = 0; k < N*N; ++k) arr[k] = noind;
+	arr[ind(0  ,0  )] = mint+(rand()*1.0/RAND_MAX)*(maxt-mint);
+	arr[ind(0  ,N-1)] = mint+(rand()*1.0/RAND_MAX)*(maxt-mint);
+	arr[ind(N-1,0  )] = mint+(rand()*1.0/RAND_MAX)*(maxt-mint);
+	arr[ind(N-1,N-1)] = mint+(rand()*1.0/RAND_MAX)*(maxt-mint);
+}
+
+double intrp2d(double * arr, int N, double x, double y)
+{
+	int n = ceil(x*(N-1));
+	int m = ceil(y*(N-1));
+	if( n == 0 ) n = 1;
+	if( m == 0 ) m = 1;
+	double dh = 1.0/(double)(N-1);
+	double kx = (x-(n-1)*dh)/dh;
+	double ky = (y-(m-1)*dh)/dh;
+	//if( kx < 0 || kx > 1 ) std::cout << "bad kx: " << kx << " x is " << x << " n is " << n << " dh is " << dh << " N is " << N << std::endl;
+	//if( ky < 0 || ky > 1 ) std::cout << "bad ky: " << ky << " y is " << y << " m is " << m << " dh is " << dh << " N is " << N << std::endl;
+	double lb = arr[ind(m-1,n-1)];
+	double rb = arr[ind(m-1,n+0)];
+	double lt = arr[ind(m+0,n-1)];
+	double rt = arr[ind(m+0,n+0)];
+	if( lb != lb || rb != rb || lt != lt || rt != rt ) throw -1;
+	return (1-ky)*(lb*(1-kx) + rb*kx) + ky*(lt*(1-kx) + rt*kx);
+}
+
+double intrp2dx(double * arr, int N, double x, double y)
+{
+	int n = ceil(x*(N-1));
+	int m = ceil(y*(N-1));
+	if( n == 0 ) n = 1;
+	if( m == 0 ) m = 1;
+	double dh = 1.0/(double)(N-1);
+	double lb = arr[ind(m-1,n-1)];
+	double rb = arr[ind(m-1,n+0)];
+	double lt = arr[ind(m+0,n-1)];
+	double rt = arr[ind(m+0,n+0)];
+	return 0.5*((rt+rb) - (lt+lb))/dh;
+}
+
+double intrp2dy(double * arr, int N, double x, double y)
+{
+	int n = ceil(x*(N-1));
+	int m = ceil(y*(N-1));
+	if( n == 0 ) n = 1;
+	if( m == 0 ) m = 1;
+	double dh = 1.0/(double)(N-1);
+	double lb = arr[ind(m-1,n-1)];
+	double rb = arr[ind(m-1,n+0)];
+	double lt = arr[ind(m+0,n-1)];
+	double rt = arr[ind(m+0,n+0)];
+	return 0.5*((rt+lt) - (rb+lb))/dh;
+}
+
+
+void transform(double xyz[3], const double max[3], const double min[3], double & ztop, double & zbottom, double nrmtop[3], double nrmbottom[3])
 {
 	double x = (xyz[0]-min[0])/(max[0]-min[0]), y = (xyz[1]-min[1])/(max[1]-min[1]), z = (xyz[2]-min[2])/(max[2]-min[2]);
 	if( x < 0 || x > 1 ) std::cout << "x: " << x << std::endl;
@@ -27,16 +115,25 @@ void transform(double xyz[3], double max[3], double min[3], double & ztop, doubl
 	if( z < 0 || z > 1 ) std::cout << "z: " << z << " xyz " << xyz[0] << " " << xyz[1] << " " << xyz[2] << " unit " << x << " " << y << " " << z << " min " << min[0] << " " << min[1] << " " << min[2] << " max " << max[0] << " " << max[1] << " " << max[2] << std::endl;
 	double dztopdx = 0, dztopdy = 0;
 	double dzbottomdx = 0, dzbottomdy = 0;
+	double shift = 0;
 	//zbottom = x*x*4-y*y*4-sin(6*x)*8 - cos(4*y)*4 - x*15;
 	//ztop = x*x*4-y*y*4-sin(6*x)*8 - cos(4*y)*4 - y*15 + 15;
-	zbottom = std::sin(y*pi *2)*0.2;// ((x - 0.5)*(x - 0.5) + (y - 0.5)*(y - 0.5))*0.4;
-	ztop = std::sin(y*pi *2)*0.2+1;// 1 + cos(4 * y)*0.2 + ((x - 0.5)*(x - 0.5) + (y - 0.5)*(y - 0.5))*0.4 + 1 + cos(4 * y)*0.5;
 	
-	dzbottomdx = 0;
-	dzbottomdy = 2*pi*std::cos(y*pi*2)*0.2;
 	
-	dztopdx = 0;
-	dztopdy = 2*pi*std::cos(y*pi*2)*0.2;
+	//zbottom = std::sin(y*pi *2)*0.2;// ((x - 0.5)*(x - 0.5) + (y - 0.5)*(y - 0.5))*0.4;
+	//ztop = std::sin(y*pi *2)*0.2+1;// 1 + cos(4 * y)*0.2 + ((x - 0.5)*(x - 0.5) + (y - 0.5)*(y - 0.5))*0.4 + 1 + cos(4 * y)*0.5;
+	//dzbottomdx = 0;
+	//dzbottomdy = 2*pi*std::cos(y*pi*2)*0.2;
+	//dztopdx = 0;
+	//dztopdy = 2*pi*std::cos(y*pi*2)*0.2;
+	
+	shift = intrp2d(&map[0],N,x,y);
+	zbottom = shift;
+	ztop = 1+shift;
+	dzbottomdx = dztopdx = intrp2dx(&map[0],N,x,y);
+	dzbottomdy = dztopdy = intrp2dy(&map[0],N,x,y);
+	
+	
 	
 	//zbottom = 0;// ((x-0.5)*(x-0.5) + (y-0.5)*(y-0.5))*0.4;
 	//ztop = 1 + 1*y;//cos(4*y)*0.2;// + ((x-0.5)*(x-0.5) + (y-0.5)*(y-0.5))*0.4 + 1 + cos(4*y)*0.5;
@@ -160,7 +257,6 @@ void rotate_tensor(double nrm[3], const double Kin[3], double Kout[6])
 	Kout[3] = prod[4];
 	Kout[4] = prod[5];
 	Kout[5] = prod[8];
-
 }
 
 int main(int argc, char *argv[]) 
@@ -168,7 +264,7 @@ int main(int argc, char *argv[])
 	if (argc < 2)
 	{
 		std::cout << "Usage: " << argv[0] ;
-		std::cout << " output.grdecl [lnx=0 rnx=60 lny=0 rny=220 lnz=0 rnz=85]" << std::endl;
+		std::cout << " output.grdecl [deformation=0.5] [lnx=0 rnx=60 lny=0 rny=220 lnz=0 rnz=85]" << std::endl;
 		return -1;
 	}
 
@@ -184,16 +280,23 @@ int main(int argc, char *argv[])
 	
 	double value, ztop, zbottom, xyz[3], xyzout[3], nrmtop[3], nrmbottom[3], nrm[3], Kin[3], Kout[6];
 	double max[3] = {240,440,340}, min[3] = {0,0,0};
+	double deformation = 0.5;
 	int nx = 60, ny = 220, nz = 85, nout = 0, m;
 	int lnx = 0, lny = 0, lnz = 0;
 	int rnx = nx, rny = ny, rnz = nz;
 	
-	if( argc > 2 ) lnx = atoi(argv[2]);
-	if( argc > 3 ) rnx = atoi(argv[3]);
-	if( argc > 4 ) lny = atoi(argv[4]);
-	if( argc > 5 ) rny = atoi(argv[5]);
-	if( argc > 6 ) lnz = atoi(argv[6]);
-	if( argc > 7 ) rnz = atoi(argv[7]);
+	if( argc > 2 ) deformation = atof(argv[2]);
+	
+	map.resize(N*N,0.0);
+	init2d(&map[0],N,0.0,deformation);
+	rand2d(&map[0],N,0,N-1,0,N-1,deformation*0.5);
+	
+	if( argc > 3 ) lnx = atoi(argv[3]);
+	if( argc > 4 ) rnx = atoi(argv[4]);
+	if( argc > 5 ) lny = atoi(argv[5]);
+	if( argc > 6 ) rny = atoi(argv[6]);
+	if( argc > 7 ) lnz = atoi(argv[7]);
+	if( argc > 8 ) rnz = atoi(argv[8]);
 	std::cout << "intervals x " << lnx << ":" << rnx << " y " << lny << ":" << rny << " " << lnz << ":" << rnz << std::endl;
   
 	std::cout << "Writing grid data." << std::endl;
