@@ -110,8 +110,8 @@ double intrp2dy(double * arr, int N, double x, double y)
 void transform(double xyz[3], const double max[3], const double min[3], double & ztop, double & zbottom, double nrmtop[3], double nrmbottom[3])
 {
 	double x = (xyz[0]-min[0])/(max[0]-min[0]), y = (xyz[1]-min[1])/(max[1]-min[1]), z = (xyz[2]-min[2])/(max[2]-min[2]);
-	if( x < 0 || x > 1 ) std::cout << "x: " << x << std::endl;
-	if( y < 0 || y > 1 ) std::cout << "y: " << y << std::endl;
+	if( x < 0 || x > 1 ) {throw -1; std::cout << "x: " << x << " xyz " << xyz[0] << " " << xyz[1] << " " << xyz[2] << " unit " << x << " " << y << " " << z << " min " << min[0] << " " << min[1] << " " << min[2] << " max " << max[0] << " " << max[1] << " " << max[2] << std::endl;}
+	if( y < 0 || y > 1 ) std::cout << "y: " << y << " xyz " << xyz[0] << " " << xyz[1] << " " << xyz[2] << " unit " << x << " " << y << " " << z << " min " << min[0] << " " << min[1] << " " << min[2] << " max " << max[0] << " " << max[1] << " " << max[2] << std::endl;
 	if( z < 0 || z > 1 ) std::cout << "z: " << z << " xyz " << xyz[0] << " " << xyz[1] << " " << xyz[2] << " unit " << x << " " << y << " " << z << " min " << min[0] << " " << min[1] << " " << min[2] << " max " << max[0] << " " << max[1] << " " << max[2] << std::endl;
 	double dztopdx = 0, dztopdy = 0;
 	double dzbottomdx = 0, dzbottomdy = 0;
@@ -264,7 +264,7 @@ int main(int argc, char *argv[])
 	if (argc < 2)
 	{
 		std::cout << "Usage: " << argv[0] ;
-		std::cout << " output.grdecl [deformation=0.5] [lnx=0 rnx=60 lny=0 rny=220 lnz=0 rnz=85]" << std::endl;
+		std::cout << " output.grdecl [deformation=0.5] [lnx=0 rnx=60 lny=0 rny=220 lnz=0 rnz=85] [refine_x=1] [refine_y=1] [refine_z=1]" << std::endl;
 		return -1;
 	}
 
@@ -284,6 +284,7 @@ int main(int argc, char *argv[])
 	int nx = 60, ny = 220, nz = 85, nout = 0, m;
 	int lnx = 0, lny = 0, lnz = 0;
 	int rnx = nx, rny = ny, rnz = nz;
+	int refx = 1, refy = 1, refz = 1;
 	
 	if( argc > 2 ) deformation = atof(argv[2]);
 	
@@ -291,45 +292,56 @@ int main(int argc, char *argv[])
 	init2d(&map[0],N,0.0,deformation);
 	rand2d(&map[0],N,0,N-1,0,N-1,deformation*0.5);
 	
-	if( argc > 3 ) lnx = atoi(argv[3]);
-	if( argc > 4 ) rnx = atoi(argv[4]);
-	if( argc > 5 ) lny = atoi(argv[5]);
-	if( argc > 6 ) rny = atoi(argv[6]);
-	if( argc > 7 ) lnz = atoi(argv[7]);
-	if( argc > 8 ) rnz = atoi(argv[8]);
+	if( argc > 3  ) lnx  = atoi(argv[3]);
+	if( argc > 4  ) rnx  = atoi(argv[4]);
+	if( argc > 5  ) lny  = atoi(argv[5]);
+	if( argc > 6  ) rny  = atoi(argv[6]);
+	if( argc > 7  ) lnz  = atoi(argv[7]);
+	if( argc > 8  ) rnz  = atoi(argv[8]);
+	if( argc > 9  ) refx = atoi(argv[9]);
+	if( argc > 10 ) refy = atoi(argv[10]);
+	if( argc > 11 ) refz = atoi(argv[11]);
 	std::cout << "intervals x " << lnx << ":" << rnx << " y " << lny << ":" << rny << " " << lnz << ":" << rnz << std::endl;
+	
+	std::cout << "refinement x " << refx << " y " << refy << " z " << refz << std::endl;
   
 	std::cout << "Writing grid data." << std::endl;
 	
 	f << "DIMENS" << std::endl;
-	f << rnx-lnx << " " << rny-lny << " " << rnz-lnz << std::endl;
+	f << (rnx-lnx)*refx << " " << (rny-lny)*refy << " " << (rnz-lnz)*refz << std::endl;
 	f << "/" << std::endl;
 	
 	f << "SPECGRID" << std::endl;
-	f << rnx-lnx << " " << rny-lny << " " << rnz-lnz << " " << 1 << " " << 'P' << std::endl;
+	f << (rnx-lnx)*refx << " " << (rny-lny)*refy << " " << (rnz-lnz)*refz << " " << 1 << " " << 'P' << std::endl;
 	f << "/" << std::endl;
 	
 	f << "COORD" << std::endl;
 	for(int j = lny; j <= rny; ++j)
 	{
-		for(int i = lnx; i <= rnx; ++i)
+		for(int jr = 0; jr < (j < rny ? refy : 1); jr++)
 		{
-			//bottom point
-			xyz[0] = 240.0 * i / 60.0;
-			xyz[1] = 440.0 * j / 220.0;
-			xyz[2] = 340.0 * 0.0 / 85.0;
-			transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
-			changexyz(xyz,max,min,ztop,zbottom,xyzout);
-			f << xyzout[0] << " " << xyzout[1] << " " << xyzout[2];
-			f << " ";
-			//top point
-			xyz[0] = 240.0 * i / 60.0;
-			xyz[1] = 440.0 * j / 220.0;
-			xyz[2] = 340.0 * nz / 85.0;
-			transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
-			changexyz(xyz,max,min,ztop,zbottom,xyzout);
-			f << xyzout[0] << " " << xyzout[1] << " " << xyzout[2];
-			f << std::endl;
+			for(int i = lnx; i <= rnx; ++i)
+			{
+				for(int ir = 0; ir < (i < rnx ? refx : 1); ir++)
+				{
+					//bottom point
+					xyz[0] = 240.0 * (i * refx + ir) / ( 60.0 * refx);
+					xyz[1] = 440.0 * (j * refy + jr) / (220.0 * refy);
+					xyz[2] = 340.0 * 0.0 / 85.0;
+					transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+					changexyz(xyz,max,min,ztop,zbottom,xyzout);
+					f << xyzout[0] << " " << xyzout[1] << " " << xyzout[2];
+					f << " ";
+					//top point
+					xyz[0] = 240.0 * (i * refx + ir) / ( 60.0 * refx);
+					xyz[1] = 440.0 * (j * refy + jr) / (220.0 * refy);
+					xyz[2] = 340.0 * nz / 85.0;
+					transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+					changexyz(xyz,max,min,ztop,zbottom,xyzout);
+					f << xyzout[0] << " " << xyzout[1] << " " << xyzout[2];
+					f << std::endl;
+				}
+			}
 		}
 	}
 	f << "/" << std::endl;
@@ -338,86 +350,107 @@ int main(int argc, char *argv[])
 	nout = 0;
 	for(int k = lnz; k < rnz; ++k)
 	{
-		//top corners
-		xyz[2] = 340.0 * k / 85.0;
-		for(int j = lny; j < rny; ++j)
+		for(int kr = 0; kr < refz; ++kr)
 		{
-			xyz[1] = 440.0 * j / 220.0;
-			//top corners, near left and near right
-			for(int i = lnx; i < rnx; ++i)
+			//top corners
+			xyz[2] = 340.0 * (k * refz + kr) / (85.0 * refz);
+			for(int j = lny; j < rny; ++j)
 			{
-				//top near left corner
-				xyz[0] = 240.0 * i / 60.0;
-				transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
-				changexyz(xyz,max,min,ztop,zbottom,xyzout);
-				f << xyzout[2] << " ";
-				//top near right corner
-				xyz[0] = 240.0 * (i+1) / 60.0;
-				transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
-				changexyz(xyz,max,min,ztop,zbottom,xyzout);
-				f << xyzout[2] << " ";
-				nout++;
-				if( nout % 5 == 0 ) 
-					f << std::endl;
+				for(int jr = 0; jr < refy; ++jr)
+				{
+					xyz[1] = 440.0 * (j * refy + jr) / (220.0 * refy);
+					//top corners, near left and near right
+					for(int i = lnx; i < rnx; ++i)
+					{
+						for(int ir = 0; ir < refx; ++ir)
+						{
+							//top near left corner
+							xyz[0] = 240.0 * (i * refx + ir) / (60.0 * refx);
+							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							changexyz(xyz,max,min,ztop,zbottom,xyzout);
+							f << xyzout[2] << " ";
+							//top near right corner
+							xyz[0] = 240.0 * (i * refx + ir + 1) / (60.0 * refx);
+							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							changexyz(xyz,max,min,ztop,zbottom,xyzout);
+							f << xyzout[2] << " ";
+							nout++;
+							if( nout % 5 == 0 ) 
+								f << std::endl;
+						}
+					}
+					xyz[1] = 440.0 * (j * refy + jr +1) / (220.0 * refy);
+					//top corners, far left and far right
+					for(int i = lnx; i < rnx; ++i)
+					{
+						for(int ir = 0; ir < refx; ++ir)
+						{
+							// top far left corner
+							xyz[0] = 240.0 * (i * refx + ir) / (60.0 * refx);
+							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							changexyz(xyz,max,min,ztop,zbottom,xyzout);
+							f << xyzout[2] << " ";
+							// top far right corner
+							xyz[0] = 240.0 * (i * refx + ir + 1) / (60.0 * refx);
+							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							changexyz(xyz,max,min,ztop,zbottom,xyzout);
+							f << xyzout[2] << " ";
+							nout++;
+							if( nout % 5 == 0 ) 
+								f << std::endl;
+						}
+					}
+				}
 			}
-			xyz[1] = 440.0 * (j+1) / 220.0;
-			//top corners, far left and far right
-			for(int i = lnx; i < rnx; ++i)
+			xyz[2] = 340.0 * (k * refz + kr + 1) / (85.0 * refz);
+			//bottom corners 
+			for(int j = lny; j < rny; ++j)
 			{
-				// top far left corner
-				xyz[0] = 240.0 * i / 60.0;
-				transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
-				changexyz(xyz,max,min,ztop,zbottom,xyzout);
-				f << xyzout[2] << " ";
-				// top far right corner
-				xyz[0] = 240.0 * (i+1) / 60.0;
-				transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
-				changexyz(xyz,max,min,ztop,zbottom,xyzout);
-				f << xyzout[2] << " ";
-				nout++;
-				if( nout % 5 == 0 ) 
-					f << std::endl;
-			}
-		}
-		xyz[2] = 340.0 * (k+1) / 85.0;
-		//bottom corners 
-		for(int j = lny; j < rny; ++j)
-		{
-			xyz[1] = 440.0 * j / 220.0;
-			//top corners, near left and near right
-			for(int i = lnx; i < rnx; ++i)
-			{
-				//bottom near left corner
-				xyz[0] = 240.0 * i / 60.0;
-				transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
-				changexyz(xyz,max,min,ztop,zbottom,xyzout);
-				f << xyzout[2] << " ";
-				//bottom near right corner
-				xyz[0] = 240.0 * (i+1) / 60.0;
-				transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
-				changexyz(xyz,max,min,ztop,zbottom,xyzout);
-				f << xyzout[2] << " ";
-				nout++;
-				if( nout % 5 == 0 ) 
-					f << std::endl;
-			}
-			xyz[1] = 440.0 * (j+1) / 220.0;
-			//top corners, far left and far right
-			for(int i = lnx; i < rnx; ++i)
-			{
-				//bottom far left corner
-				xyz[0] = 240.0 * i / 60.0;
-				transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
-				changexyz(xyz,max,min,ztop,zbottom,xyzout);
-				f << xyzout[2] << " ";
-				//bottom far right corner
-				xyz[0] = 240.0 * (i+1) / 60.0;
-				transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
-				changexyz(xyz,max,min,ztop,zbottom,xyzout);
-				f << xyzout[2] << " ";
-				nout++;
-				if( nout % 5 == 0 ) 
-					f << std::endl;
+				for(int jr = 0; jr < refy; ++jr)
+				{
+					xyz[1] = 440.0 * (j * refy + jr) / (220.0 * refy);
+					//top corners, near left and near right
+					for(int i = lnx; i < rnx; ++i)
+					{
+						for(int ir = 0; ir < refx; ++ir)
+						{
+							//bottom near left corner
+							xyz[0] = 240.0 * (i * refx + ir) / (60.0 * refx);
+							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							changexyz(xyz,max,min,ztop,zbottom,xyzout);
+							f << xyzout[2] << " ";
+							//bottom near right corner
+							xyz[0] = 240.0 * (i * refx + ir + 1) / (60.0 * refx);
+							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							changexyz(xyz,max,min,ztop,zbottom,xyzout);
+							f << xyzout[2] << " ";
+							nout++;
+							if( nout % 5 == 0 ) 
+								f << std::endl;
+						}
+					}
+					xyz[1] = 440.0 * (j * refy + jr + 1) / (220.0 * refy);
+					//top corners, far left and far right
+					for(int i = lnx; i < rnx; ++i)
+					{
+						for(int ir = 0; ir < refx; ++ir)
+						{
+							//bottom far left corner
+							xyz[0] = 240.0 * (i * refx + ir) / (60.0 * refx);
+							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							changexyz(xyz,max,min,ztop,zbottom,xyzout);
+							f << xyzout[2] << " ";
+							//bottom far right corner
+							xyz[0] = 240.0 * (i * refx + ir + 1) / (60.0 * refx);
+							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							changexyz(xyz,max,min,ztop,zbottom,xyzout);
+							f << xyzout[2] << " ";
+							nout++;
+							if( nout % 5 == 0 ) 
+								f << std::endl;
+						}
+					}
+				}
 			}
 		}
 	}
@@ -438,6 +471,8 @@ int main(int argc, char *argv[])
 	else
 	{
 		f << "PORO" << std::endl;
+		std::vector<double> poro;
+		poro.reserve(nz*ny*nx);
 		for(int k = 0; k < nz; ++k)
 		{
 			for(int j = 0; j < ny; ++j)
@@ -445,11 +480,25 @@ int main(int argc, char *argv[])
 				for(int i = 0; i < nx; ++i)
 				{
 					fporo >> value;
+					poro.push_back(value);
+				}
+			}
+		}
+		for(int k = 0; k < nz; ++k)
+		{
+			for(int kr = 0; kr < refz; ++kr)
+			for(int j = 0; j < ny; ++j)
+			{
+				for(int jr = 0; jr < refy; ++jr)
+				for(int i = 0; i < nx; ++i)
+				{
+					for(int ir = 0; ir < refx; ++ir)
 					if( i >= lnx && i < rnx &&
 						j >= lny && j < rny &&
 						k >= lnz && k < rnz )
 					{
-						f << value << " ";
+						int ind = i + j * nx + k * nx*ny;
+						f << poro[ind] << " ";
 						nout++;
 						if( nout % 10 == 0 ) 
 							f << std::endl;
@@ -536,20 +585,23 @@ int main(int argc, char *argv[])
 			m = nout = 0;
 			for(int k = 0; k < nz; ++k)
 			{
+				for(int kr = 0; kr < refz; ++kr)
 				for(int j = 0; j < ny; ++j)
 				{
+					for(int jr = 0; jr < refy; ++jr)
 					for(int i = 0; i < nx; ++i)
 					{
+						for(int ir = 0; ir < refx; ++ir)
 						if( i >= lnx && i < rnx &&
 							j >= lny && j < rny &&
 							k >= lnz && k < rnz )
 						{
-							f << permnew[l][m] << " ";
+							int ind = i + j * nx + k * nx*ny;
+							f << permnew[l][ind] << " ";
 							nout++;
 							if( nout % 10 == 0 ) 
 								f << std::endl;
 						}
-						m++;
 					}
 				}
 			}
