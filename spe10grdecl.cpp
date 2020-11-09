@@ -264,19 +264,21 @@ int main(int argc, char *argv[])
 	if (argc < 2)
 	{
 		std::cout << "Usage: " << argv[0] ;
-		std::cout << " output.grdecl [deformation=0.5] [lnx=0 rnx=60 lny=0 rny=220 lnz=0 rnz=85] [refine_x=1] [refine_y=1] [refine_z=1]" << std::endl;
+		std::cout << " output.grdecl [deformation=0.5] [lnx=0 rnx=60 lny=0 rny=220 lnz=0 rnz=85] [refine_x=1] [refine_y=1] [refine_z=1] [write_vtk=1]" << std::endl;
 		return -1;
 	}
 
-  
+	bool wvtk = true;
 	std::cout << "Opening " << argv[1] << " for output." << std::endl;
-	std::ofstream f(argv[1]);
+	std::ofstream f(argv[1]), fvtk;
 	
 	if( f.fail() )
 	{
 		std::cout << "Cannot open " << argv[1] << " for writing!" << std::endl;
 		return -1;
 	}
+	
+	
 	
 	double value, ztop, zbottom, xyz[3], xyzout[3], nrmtop[3], nrmbottom[3], nrm[3], Kin[3], Kout[6];
 	double max[3] = {240,440,340}, min[3] = {0,0,0};
@@ -301,6 +303,18 @@ int main(int argc, char *argv[])
 	if( argc > 9  ) refx = atoi(argv[9]);
 	if( argc > 10 ) refy = atoi(argv[10]);
 	if( argc > 11 ) refz = atoi(argv[11]);
+	if( argc > 12 ) wvtk = atoi(argv[12]);
+	
+	if( wvtk )
+	{
+		std::cout << "Opening " << argv[1] << ".vtk for output." << std::endl;
+		fvtk.open(std::string(argv[1])+".vtk");
+		fvtk << "# vtk DataFile Version 2.0" << std::endl;
+		fvtk << "vtk file" << std::endl;
+		fvtk << "ASCII" << std::endl;
+		fvtk << "DATASET UNSTRUCTURED_GRID" << std::endl;
+	}
+	
 	std::cout << "intervals x " << lnx << ":" << rnx << " y " << lny << ":" << rny << " " << lnz << ":" << rnz << std::endl;
 	
 	std::cout << "refinement x " << refx << " y " << refy << " z " << refz << std::endl;
@@ -345,6 +359,43 @@ int main(int argc, char *argv[])
 		}
 	}
 	f << "/" << std::endl;
+	
+	if( wvtk )
+	{
+		std::cout << "write coordinates to VTK file" << std::endl;
+		size_t npx = (rnx-lnx)*refx+1;
+		size_t npy = (rny-lny)*refy+1;
+		size_t npz = (rnz-lnz)*refz+1;
+		size_t npoints = npx*npy*npz;
+		fvtk << "POINTS " << npoints << " double" << std::endl;
+		for(int k = lnz; k <= rnz; ++k)
+		{
+			for(int kr = 0; kr < (k < rnz ? refz : 1); ++kr)
+			{
+				for(int j = lny; j <= rny; ++j)
+				{
+					for(int jr = 0; jr < (j < rny ? refy : 1); jr++)
+					{
+						for(int i = lnx; i <= rnx; ++i)
+						{
+							for(int ir = 0; ir < (i < rnx ? refx : 1); ir++)
+							{
+								//bottom point
+								xyz[0] = 240.0 * (i * refx + ir) / ( 60.0 * refx);
+								xyz[1] = 440.0 * (j * refy + jr) / (220.0 * refy);
+								xyz[2] = 340.0 * (k * refz + kr) / ( 85.0 * refz);
+								transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+								changexyz(xyz,max,min,ztop,zbottom,xyzout);
+								fvtk << xyzout[0] << " " << xyzout[1] << " " << xyzout[2] << std::endl;
+							}
+						}
+					}
+				}
+			}
+		}
+		fvtk << std::endl;
+		std::cout << "done with coordinates in VTK file" << std::endl;
+	}
 	
 	f << "ZCORN" << std::endl;
 	nout = 0;
@@ -459,7 +510,81 @@ int main(int argc, char *argv[])
 	f << "/" << std::endl;
 	
 	
+	if( wvtk )
+	{
+		std::cout << "write cells to VTK file" << std::endl;
+		size_t npx = (rnx-lnx)*refx+1;
+		size_t npy = (rny-lny)*refy+1;
+		size_t npz = (rnz-lnz)*refz+1;
+		size_t ncx = (rnx-lnx)*refx;
+		size_t ncy = (rny-lny)*refy;
+		size_t ncz = (rnz-lnz)*refz;
+		size_t ncells = ncx*ncy*ncz;
+		fvtk << "CELLS " << ncells << " " << 9*ncells << std::endl;
+		for(int k = lnz; k < rnz; ++k)
+		{
+			for(int kr = 0; kr < refz; ++kr)
+			{
+				for(int j = lny; j < rny; ++j)
+				{
+					for(int jr = 0; jr < refy; ++jr)
+					{
+						for(int i = lnx; i < rnx; ++i)
+						{
+							for(int ir = 0; ir < refx; ++ir)
+							{
+								fvtk << 8 << " ";
+								fvtk << i * refx + ir +     (j * refy + jr    )*npx + (k * refz + kr    )*npx*npy << " ";
+								fvtk << i * refx + ir + 1 + (j * refy + jr    )*npx + (k * refz + kr    )*npx*npy << " ";
+								fvtk << i * refx + ir + 1 + (j * refy + jr + 1)*npx + (k * refz + kr    )*npx*npy << " ";
+								fvtk << i * refx + ir +     (j * refy + jr + 1)*npx + (k * refz + kr    )*npx*npy << " ";
+								fvtk << i * refx + ir +     (j * refy + jr    )*npx + (k * refz + kr + 1)*npx*npy << " ";
+								fvtk << i * refx + ir + 1 + (j * refy + jr    )*npx + (k * refz + kr + 1)*npx*npy << " ";
+								fvtk << i * refx + ir + 1 + (j * refy + jr + 1)*npx + (k * refz + kr + 1)*npx*npy << " ";
+								fvtk << i * refx + ir +     (j * refy + jr + 1)*npx + (k * refz + kr + 1)*npx*npy << " ";
+								fvtk << std::endl;
+							}
+						}
+					}
+				}
+			}
+		}
+		fvtk << std::endl;
+		fvtk << "CELL_TYPES " << ncells << std::endl;
+		for(int k = lnz; k < rnz; ++k)
+		{
+			for(int kr = 0; kr < refz; ++kr)
+			{
+				for(int j = lny; j < rny; ++j)
+				{
+					for(int jr = 0; jr < refy; ++jr)
+					{
+						for(int i = lnx; i < rnx; ++i)
+						{
+							for(int ir = 0; ir < refx; ++ir)
+							{
+								fvtk << 12 << std::endl;
+							}
+						}
+					}
+				}
+			}
+		}
+		fvtk << std::endl;
+		std::cout << "done with cells in VTK file" << std::endl;
+	}
+	
+	
 	std::cout << "Writing properties data." << std::endl;
+	
+	if( wvtk )
+	{
+		size_t ncx = (rnx-lnx)*refx;
+		size_t ncy = (rny-lny)*refy;
+		size_t ncz = (rnz-lnz)*refz;
+		size_t ncells = ncx*ncy*ncz;
+		fvtk << "CELL_DATA " << ncells << std::endl;
+	}
 	
 	
 	std::ifstream fporo("spe_phi.dat");
@@ -484,6 +609,7 @@ int main(int argc, char *argv[])
 				}
 			}
 		}
+		fporo.close();
 		for(int k = 0; k < nz; ++k)
 		{
 			for(int kr = 0; kr < refz; ++kr)
@@ -509,7 +635,34 @@ int main(int argc, char *argv[])
 		if( nout % 10 != 0 ) 
 			f << std::endl;
 		f << "/" << std::endl;
-		fporo.close();
+		
+		if( wvtk )
+		{
+			std::cout << "write PORO to VTK file" << std::endl;
+			fvtk << "SCALARS PORO double" << std::endl;
+			fvtk << "LOOKUP_TABLE default" << std::endl;
+			for(int k = 0; k < nz; ++k)
+			{
+				for(int kr = 0; kr < refz; ++kr)
+				for(int j = 0; j < ny; ++j)
+				{
+					for(int jr = 0; jr < refy; ++jr)
+					for(int i = 0; i < nx; ++i)
+					{
+						for(int ir = 0; ir < refx; ++ir)
+						if( i >= lnx && i < rnx &&
+							j >= lny && j < rny &&
+							k >= lnz && k < rnz )
+						{
+							int ind = i + j * nx + k * nx*ny;
+							fvtk << poro[ind] << std::endl;
+						}
+					}
+				}
+			}
+			fvtk << std::endl;
+			std::cout << "done with PORO in VTK file" << std::endl;
+		}
 	}
 	
 	
@@ -609,10 +762,46 @@ int main(int argc, char *argv[])
 				f << std::endl;
 			f << "/" << std::endl;
 		}
+		
+		
+		if( wvtk )
+		{
+			std::cout << "write PERM to VTK file" << std::endl;
+			fvtk << "SCALARS PERM double 6" << std::endl;
+			fvtk << "LOOKUP_TABLE default" << std::endl;
+			for(int k = 0; k < nz; ++k)
+			{
+				for(int kr = 0; kr < refz; ++kr)
+				for(int j = 0; j < ny; ++j)
+				{
+					for(int jr = 0; jr < refy; ++jr)
+					for(int i = 0; i < nx; ++i)
+					{
+						for(int ir = 0; ir < refx; ++ir)
+						if( i >= lnx && i < rnx &&
+							j >= lny && j < rny &&
+							k >= lnz && k < rnz )
+						{
+							int ind = i + j * nx + k * nx*ny;
+							for(int l = 0; l < 6; ++l)
+								fvtk << permnew[l][ind] << " ";
+							fvtk << std::endl;
+						}
+					}
+				}
+			}
+			fvtk << std::endl;
+			std::cout << "done with PERM in VTK file" << std::endl;
+		}
 	}
 	
 	std::cout << "Closing file " << argv[1] << "." << std::endl;
 	f.close();
+	if( wvtk )
+	{
+		std::cout << "Closing VTK file" << std::endl;
+		fvtk.close();
+	}
 	std::cout << "Done!" << std::endl;
 
 	return 0;
