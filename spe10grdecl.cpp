@@ -264,11 +264,11 @@ int main(int argc, char *argv[])
 	if (argc < 2)
 	{
 		std::cout << "Usage: " << argv[0] ;
-		std::cout << " output.grdecl [deformation=0.5] [lnx=0 rnx=60 lny=0 rny=220 lnz=0 rnz=85] [refine_x=1] [refine_y=1] [refine_z=1] [write_vtk=1]" << std::endl;
+		std::cout << " output.grdecl [deformation=0.5] [lnx=0 rnx=60 lny=0 rny=220 lnz=0 rnz=85] [refine_x=1] [refine_y=1] [refine_z=1] [write_vtk=1(1:hex,2:tet)]" << std::endl;
 		return -1;
 	}
 
-	bool wvtk = true;
+	int wvtk = 1;
 	std::cout << "Opening " << argv[1] << " for output." << std::endl;
 	std::ofstream f(argv[1]), fvtk;
 	
@@ -308,6 +308,15 @@ int main(int argc, char *argv[])
 	if( wvtk )
 	{
 		std::cout << "Opening " << argv[1] << ".vtk for output." << std::endl;
+		if( wvtk == 1 )
+			std::cout << "Writing hexahedral mesh." << std::endl;
+		else if( wvtk == 2 )
+			std::cout << "Writing tetrahedral mesh." << std::endl;
+		else
+		{
+			std::cout << "Unknown type of mesh " << wvtk << " (1:hexahedral, 2:tetrahedral), setting hexahedral." << std::endl;
+			wvtk = 1;
+		}
 		fvtk.open(std::string(argv[1])+".vtk");
 		fvtk << "# vtk DataFile Version 2.0" << std::endl;
 		fvtk << "vtk file" << std::endl;
@@ -520,7 +529,13 @@ int main(int argc, char *argv[])
 		size_t ncy = (rny-lny)*refy;
 		size_t ncz = (rnz-lnz)*refz;
 		size_t ncells = ncx*ncy*ncz;
-		fvtk << "CELLS " << ncells << " " << 9*ncells << std::endl;
+		size_t records = 9*ncells;
+		if( wvtk == 2 )
+		{
+			ncells *= 6;
+			records = ncells*5;
+		}
+		fvtk << "CELLS " << ncells << " " << records << std::endl;
 		for(int k = lnz; k < rnz; ++k)
 		{
 			for(int kr = 0; kr < refz; ++kr)
@@ -533,16 +548,44 @@ int main(int argc, char *argv[])
 						{
 							for(int ir = 0; ir < refx; ++ir)
 							{
-								fvtk << 8 << " ";
-								fvtk << i * refx + ir +     (j * refy + jr    )*npx + (k * refz + kr    )*npx*npy << " ";
-								fvtk << i * refx + ir + 1 + (j * refy + jr    )*npx + (k * refz + kr    )*npx*npy << " ";
-								fvtk << i * refx + ir + 1 + (j * refy + jr + 1)*npx + (k * refz + kr    )*npx*npy << " ";
-								fvtk << i * refx + ir +     (j * refy + jr + 1)*npx + (k * refz + kr    )*npx*npy << " ";
-								fvtk << i * refx + ir +     (j * refy + jr    )*npx + (k * refz + kr + 1)*npx*npy << " ";
-								fvtk << i * refx + ir + 1 + (j * refy + jr    )*npx + (k * refz + kr + 1)*npx*npy << " ";
-								fvtk << i * refx + ir + 1 + (j * refy + jr + 1)*npx + (k * refz + kr + 1)*npx*npy << " ";
-								fvtk << i * refx + ir +     (j * refy + jr + 1)*npx + (k * refz + kr + 1)*npx*npy << " ";
-								fvtk << std::endl;
+								size_t nvtx[8] =
+								{
+									(i-lnx) * refx + ir +     ((j-lny) * refy + jr    )*npx + ((k-lnz) * refz + kr    )*npx*npy,
+									(i-lnx) * refx + ir + 1 + ((j-lny) * refy + jr    )*npx + ((k-lnz) * refz + kr    )*npx*npy,
+									(i-lnx) * refx + ir + 1 + ((j-lny) * refy + jr + 1)*npx + ((k-lnz) * refz + kr    )*npx*npy,
+									(i-lnx) * refx + ir +     ((j-lny) * refy + jr + 1)*npx + ((k-lnz) * refz + kr    )*npx*npy,
+									(i-lnx) * refx + ir +     ((j-lny) * refy + jr    )*npx + ((k-lnz) * refz + kr + 1)*npx*npy,
+									(i-lnx) * refx + ir + 1 + ((j-lny) * refy + jr    )*npx + ((k-lnz) * refz + kr + 1)*npx*npy,
+									(i-lnx) * refx + ir + 1 + ((j-lny) * refy + jr + 1)*npx + ((k-lnz) * refz + kr + 1)*npx*npy,
+									(i-lnx) * refx + ir +     ((j-lny) * refy + jr + 1)*npx + ((k-lnz) * refz + kr + 1)*npx*npy
+								};
+								if( wvtk == 1 )
+								{
+									fvtk << 8;
+									for(int q = 0; q < 8; ++q)
+										fvtk << " " << nvtx[q];
+									fvtk << std::endl;
+								}
+								else if( wvtk == 2 )
+								{
+									int ntet[6][4] =
+									{
+										{0,1,3,7},
+										{0,1,7,5},
+										{0,5,7,4},
+										{1,2,3,6},
+										{1,6,3,7},
+										{1,6,7,5}
+									};
+									for(int c = 0; c < 6; ++c)
+									{
+										fvtk << 4;
+										for(int q = 0; q < 4; ++q)
+											fvtk << " " << nvtx[ntet[c][q]];
+										fvtk << std::endl;
+									}
+									
+								}
 							}
 						}
 					}
@@ -563,7 +606,15 @@ int main(int argc, char *argv[])
 						{
 							for(int ir = 0; ir < refx; ++ir)
 							{
-								fvtk << 12 << std::endl;
+								int cells = 1;
+								int ctype = 12;
+								if( wvtk == 2 )
+								{
+									cells = 6;
+									ctype = 10;
+								}
+								for(int q = 0; q < cells; ++q)
+									fvtk << ctype << std::endl;
 							}
 						}
 					}
@@ -583,6 +634,7 @@ int main(int argc, char *argv[])
 		size_t ncy = (rny-lny)*refy;
 		size_t ncz = (rnz-lnz)*refz;
 		size_t ncells = ncx*ncy*ncz;
+		if( wvtk == 2 ) ncells *= 6;
 		fvtk << "CELL_DATA " << ncells << std::endl;
 	}
 	
@@ -655,7 +707,10 @@ int main(int argc, char *argv[])
 							k >= lnz && k < rnz )
 						{
 							int ind = i + j * nx + k * nx*ny;
-							fvtk << poro[ind] << std::endl;
+							int cells = 1;
+							if( wvtk == 2 ) cells = 6;
+							for(int q = 0; q < cells; ++q)
+								fvtk << poro[ind] << std::endl;
 						}
 					}
 				}
@@ -783,9 +838,14 @@ int main(int argc, char *argv[])
 							k >= lnz && k < rnz )
 						{
 							int ind = i + j * nx + k * nx*ny;
-							for(int l = 0; l < 6; ++l)
-								fvtk << permnew[l][ind] << " ";
-							fvtk << std::endl;
+							int cells = 1;
+							if( wvtk == 2 ) cells = 6;
+							for(int q = 0; q < cells; ++q)
+							{
+								for(int l = 0; l < 6; ++l)
+									fvtk << permnew[l][ind] << " ";
+								fvtk << std::endl;
+							}
 						}
 					}
 				}
