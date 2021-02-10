@@ -258,13 +258,46 @@ void rotate_tensor(double nrm[3], const double Kin[3], double Kout[6])
 	Kout[4] = prod[5];
 	Kout[5] = prod[8];
 }
-
+/*
+void write_points_vtk(int lnx, int rnx, int refx,
+					  int lny, int rny, int refy,
+					  int lnz, int rnz, int refz,
+					  double max[3], double min[3])
+{
+	double ztop, double zbottom, xyzout[3], xyz[3], nrmtop[3], nrmbottom[3];
+	for(int k = lnz; k <= rnz; ++k)
+	{
+		for(int kr = 0; kr < (k < rnz ? refz : 1); ++kr)
+		{
+			for(int j = lny; j <= rny; ++j)
+			{
+				for(int jr = 0; jr < (j < rny ? refy : 1); jr++)
+				{
+					for(int i = lnx; i <= rnx; ++i)
+					{
+						for(int ir = 0; ir < (i < rnx ? refx : 1); ir++)
+						{
+							//bottom point
+							xyz[0] = 240.0 * (i * refx + ir) / ( 60.0 * refx);
+							xyz[1] = 440.0 * (j * refy + jr) / (220.0 * refy);
+							xyz[2] = 340.0 * (k * refz + kr) / ( 85.0 * refz);
+							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							changexyz(xyz,max,min,ztop,zbottom,xyzout);
+							fvtk << xyzout[0] << " " << xyzout[1] << " " << xyzout[2] << std::endl;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+*/
 int main(int argc, char *argv[]) 
 {
 	if (argc < 2)
 	{
 		std::cout << "Usage: " << argv[0] ;
-		std::cout << " output.grdecl [deformation=0.5] [lnx=0 rnx=60 lny=0 rny=220 lnz=0 rnz=85] [refine_x=1] [refine_y=1] [refine_z=1] [write_vtk=1(1:hex,2:tet)]" << std::endl;
+		std::cout << " output.grdecl [deformation=0.5] [lnx=0 rnx=60 lny=0 rny=220 lnz=0 rnz=85] [refine_x=1] [refine_y=1] [refine_z=1] [write_vtk=1(1:hex,2:tet,3:hex(vtu),4:tet(vtu))]" << std::endl;
 		return -1;
 	}
 
@@ -283,10 +316,12 @@ int main(int argc, char *argv[])
 	double value, ztop, zbottom, xyz[3], xyzout[3], nrmtop[3], nrmbottom[3], nrm[3], Kin[3], Kout[6];
 	double max[3] = {240,440,340}, min[3] = {0,0,0};
 	double deformation = 0.5;
-	int nx = 60, ny = 220, nz = 85, nout = 0, m;
+	int nx = 60, ny = 220, nz = 85, m;
 	int lnx = 0, lny = 0, lnz = 0;
 	int rnx = nx, rny = ny, rnz = nz;
 	int refx = 1, refy = 1, refz = 1;
+	size_t nout = 0;
+	bool vtu = false;
 	
 	if( argc > 2 ) deformation = atof(argv[2]);
 	
@@ -307,21 +342,35 @@ int main(int argc, char *argv[])
 	
 	if( wvtk )
 	{
-		std::cout << "Opening " << argv[1] << ".vtk for output." << std::endl;
-		if( wvtk == 1 )
+		std::string ext = "vtk";
+		if( wvtk == 3 || wvtk == 4 ) 
+		{
+			ext = "vtu";
+			vtu = true;
+		}
+		std::cout << "Opening " << argv[1] << "." << ext << " for output." << std::endl;
+		if( wvtk == 1 || wvtk == 3)
 			std::cout << "Writing hexahedral mesh." << std::endl;
-		else if( wvtk == 2 )
+		else if( wvtk == 2 || wvtk == 4 )
 			std::cout << "Writing tetrahedral mesh." << std::endl;
 		else
 		{
-			std::cout << "Unknown type of mesh " << wvtk << " (1:hexahedral, 2:tetrahedral), setting hexahedral." << std::endl;
+			std::cout << "Unknown type of mesh " << wvtk << " (1:hexahedral, 2:tetrahedral, 3:hexahedral(vtu), 4:tetrahedral(vtu)), setting hexahedral." << std::endl;
 			wvtk = 1;
 		}
-		fvtk.open(std::string(argv[1])+".vtk");
-		fvtk << "# vtk DataFile Version 2.0" << std::endl;
-		fvtk << "vtk file" << std::endl;
-		fvtk << "ASCII" << std::endl;
-		fvtk << "DATASET UNSTRUCTURED_GRID" << std::endl;
+		fvtk.open(std::string(argv[1])+"."+ext);
+		if( vtu )
+		{
+			fvtk << "<VTKFile type=\"UnstructuredGrid\" version=\"1.0\">" << std::endl;
+			fvtk << "\t<UnstructuredGrid>" << std::endl;
+		}
+		else
+		{
+			fvtk << "# vtk DataFile Version 2.0" << std::endl;
+			fvtk << "vtk file" << std::endl;
+			fvtk << "ASCII" << std::endl;
+			fvtk << "DATASET UNSTRUCTURED_GRID" << std::endl;
+		}
 	}
 	
 	std::cout << "intervals x " << lnx << ":" << rnx << " y " << lny << ":" << rny << " " << lnz << ":" << rnz << std::endl;
@@ -348,16 +397,16 @@ int main(int argc, char *argv[])
 				for(int ir = 0; ir < (i < rnx ? refx : 1); ir++)
 				{
 					//bottom point
-					xyz[0] = 240.0 * (i * refx + ir) / ( 60.0 * refx);
-					xyz[1] = 440.0 * (j * refy + jr) / (220.0 * refy);
+					xyz[0] = 240.0 * (i * 1. * refx + ir) / ( 60.0 * refx);
+					xyz[1] = 440.0 * (j * 1. * refy + jr) / (220.0 * refy);
 					xyz[2] = 340.0 * 0.0 / 85.0;
 					transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 					changexyz(xyz,max,min,ztop,zbottom,xyzout);
 					f << xyzout[0] << " " << xyzout[1] << " " << xyzout[2];
 					f << " ";
 					//top point
-					xyz[0] = 240.0 * (i * refx + ir) / ( 60.0 * refx);
-					xyz[1] = 440.0 * (j * refy + jr) / (220.0 * refy);
+					xyz[0] = 240.0 * (i * 1. * refx + ir) / ( 60.0 * refx);
+					xyz[1] = 440.0 * (j * 1. * refy + jr) / (220.0 * refy);
 					xyz[2] = 340.0 * nz / 85.0;
 					transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 					changexyz(xyz,max,min,ztop,zbottom,xyzout);
@@ -369,6 +418,8 @@ int main(int argc, char *argv[])
 	}
 	f << "/" << std::endl;
 	
+	
+	
 	if( wvtk )
 	{
 		std::cout << "write coordinates to VTK file" << std::endl;
@@ -376,7 +427,21 @@ int main(int argc, char *argv[])
 		size_t npy = (rny-lny)*refy+1;
 		size_t npz = (rnz-lnz)*refz+1;
 		size_t npoints = npx*npy*npz;
-		fvtk << "POINTS " << npoints << " double" << std::endl;
+		if( vtu )
+		{
+			size_t ncx = (rnx-lnx)*refx;
+			size_t ncy = (rny-lny)*refy;
+			size_t ncz = (rnz-lnz)*refz;
+			size_t ncells = ncx*ncy*ncz;
+			fvtk << "\t\t<Piece NumberOfPoints=\"" << npoints << "\" NumberOfCells=\"" << ncells << "\">" << std::endl;
+		}
+		if( vtu )
+		{
+			fvtk << "\t\t\t<Points>" << std::endl;
+			fvtk << "\t\t\t\t<DataArray type=\"Float64\" Name=\"Points\" NumberOfComponents=\"3\" format=\"ascii\">" << std::endl;
+		}
+		else fvtk << "POINTS " << npoints << " double" << std::endl;
+		//~ write_points_vtk(lnx,rnx,refx,lny,rnx,refy,lnz,rnz,refz,max,min);
 		for(int k = lnz; k <= rnz; ++k)
 		{
 			for(int kr = 0; kr < (k < rnz ? refz : 1); ++kr)
@@ -390,9 +455,9 @@ int main(int argc, char *argv[])
 							for(int ir = 0; ir < (i < rnx ? refx : 1); ir++)
 							{
 								//bottom point
-								xyz[0] = 240.0 * (i * refx + ir) / ( 60.0 * refx);
-								xyz[1] = 440.0 * (j * refy + jr) / (220.0 * refy);
-								xyz[2] = 340.0 * (k * refz + kr) / ( 85.0 * refz);
+								xyz[0] = 240.0 * (i * 1. * refx + ir) / ( 60.0 * refx);
+								xyz[1] = 440.0 * (j * 1. * refy + jr) / (220.0 * refy);
+								xyz[2] = 340.0 * (k * 1. * refz + kr) / ( 85.0 * refz);
 								transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 								changexyz(xyz,max,min,ztop,zbottom,xyzout);
 								fvtk << xyzout[0] << " " << xyzout[1] << " " << xyzout[2] << std::endl;
@@ -403,8 +468,15 @@ int main(int argc, char *argv[])
 			}
 		}
 		fvtk << std::endl;
+		if( vtu )
+		{
+			fvtk << "\t\t\t\t</DataArray>" << std::endl;
+			fvtk << "\t\t\t</Points>" << std::endl;
+		}
 		std::cout << "done with coordinates in VTK file" << std::endl;
 	}
+	
+	
 	
 	f << "ZCORN" << std::endl;
 	nout = 0;
@@ -413,24 +485,24 @@ int main(int argc, char *argv[])
 		for(int kr = 0; kr < refz; ++kr)
 		{
 			//top corners
-			xyz[2] = 340.0 * (k * refz + kr) / (85.0 * refz);
+			xyz[2] = 340.0 * (k * 1. * refz + kr) / (85.0 * refz);
 			for(int j = lny; j < rny; ++j)
 			{
 				for(int jr = 0; jr < refy; ++jr)
 				{
-					xyz[1] = 440.0 * (j * refy + jr) / (220.0 * refy);
+					xyz[1] = 440.0 * (j * 1. * refy + jr) / (220.0 * refy);
 					//top corners, near left and near right
 					for(int i = lnx; i < rnx; ++i)
 					{
 						for(int ir = 0; ir < refx; ++ir)
 						{
 							//top near left corner
-							xyz[0] = 240.0 * (i * refx + ir) / (60.0 * refx);
+							xyz[0] = 240.0 * (i * 1. * refx + ir) / (60.0 * refx);
 							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							//top near right corner
-							xyz[0] = 240.0 * (i * refx + ir + 1) / (60.0 * refx);
+							xyz[0] = 240.0 * (i * 1. * refx + ir + 1) / (60.0 * refx);
 							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
@@ -439,19 +511,19 @@ int main(int argc, char *argv[])
 								f << std::endl;
 						}
 					}
-					xyz[1] = 440.0 * (j * refy + jr +1) / (220.0 * refy);
+					xyz[1] = 440.0 * (j * 1. * refy + jr + 1) / (220.0 * refy);
 					//top corners, far left and far right
 					for(int i = lnx; i < rnx; ++i)
 					{
 						for(int ir = 0; ir < refx; ++ir)
 						{
 							// top far left corner
-							xyz[0] = 240.0 * (i * refx + ir) / (60.0 * refx);
+							xyz[0] = 240.0 * (i * 1. * refx + ir) / (60.0 * refx);
 							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							// top far right corner
-							xyz[0] = 240.0 * (i * refx + ir + 1) / (60.0 * refx);
+							xyz[0] = 240.0 * (i * 1. * refx + ir + 1) / (60.0 * refx);
 							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
@@ -462,25 +534,25 @@ int main(int argc, char *argv[])
 					}
 				}
 			}
-			xyz[2] = 340.0 * (k * refz + kr + 1) / (85.0 * refz);
+			xyz[2] = 340.0 * (k * 1. * refz + kr + 1) / (85.0 * refz);
 			//bottom corners 
 			for(int j = lny; j < rny; ++j)
 			{
 				for(int jr = 0; jr < refy; ++jr)
 				{
-					xyz[1] = 440.0 * (j * refy + jr) / (220.0 * refy);
+					xyz[1] = 440.0 * (j * 1. * refy + jr) / (220.0 * refy);
 					//top corners, near left and near right
 					for(int i = lnx; i < rnx; ++i)
 					{
 						for(int ir = 0; ir < refx; ++ir)
 						{
 							//bottom near left corner
-							xyz[0] = 240.0 * (i * refx + ir) / (60.0 * refx);
+							xyz[0] = 240.0 * (i * 1. * refx + ir) / (60.0 * refx);
 							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							//bottom near right corner
-							xyz[0] = 240.0 * (i * refx + ir + 1) / (60.0 * refx);
+							xyz[0] = 240.0 * (i * 1. * refx + ir + 1) / (60.0 * refx);
 							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
@@ -489,19 +561,19 @@ int main(int argc, char *argv[])
 								f << std::endl;
 						}
 					}
-					xyz[1] = 440.0 * (j * refy + jr + 1) / (220.0 * refy);
+					xyz[1] = 440.0 * (j * 1. * refy + jr + 1) / (220.0 * refy);
 					//top corners, far left and far right
 					for(int i = lnx; i < rnx; ++i)
 					{
 						for(int ir = 0; ir < refx; ++ir)
 						{
 							//bottom far left corner
-							xyz[0] = 240.0 * (i * refx + ir) / (60.0 * refx);
+							xyz[0] = 240.0 * (i * 1. * refx + ir) / (60.0 * refx);
 							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							//bottom far right corner
-							xyz[0] = 240.0 * (i * refx + ir + 1) / (60.0 * refx);
+							xyz[0] = 240.0 * (i * 1. * refx + ir + 1) / (60.0 * refx);
 							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
@@ -535,7 +607,12 @@ int main(int argc, char *argv[])
 			ncells *= 6;
 			records = ncells*5;
 		}
-		fvtk << "CELLS " << ncells << " " << records << std::endl;
+		if( vtu )
+		{
+			fvtk << "\t\t\t<Cells>" << std::endl;
+			fvtk << "\t\t\t\t<DataArray type=\"Int64\" Name=\"connectivity\" format=\"ascii\">" << std::endl;
+		}
+		else fvtk << "CELLS " << ncells << " " << records << std::endl;
 		for(int k = lnz; k < rnz; ++k)
 		{
 			for(int kr = 0; kr < refz; ++kr)
@@ -559,14 +636,14 @@ int main(int argc, char *argv[])
 									(i-lnx) * refx + ir + 1 + ((j-lny) * refy + jr + 1)*npx + ((k-lnz) * refz + kr + 1)*npx*npy,
 									(i-lnx) * refx + ir +     ((j-lny) * refy + jr + 1)*npx + ((k-lnz) * refz + kr + 1)*npx*npy
 								};
-								if( wvtk == 1 )
+								if( wvtk == 1 || wvtk == 3)
 								{
-									fvtk << 8;
+									if( !vtu ) fvtk << 8; //for vtu goes to offsets
 									for(int q = 0; q < 8; ++q)
 										fvtk << " " << nvtx[q];
 									fvtk << std::endl;
 								}
-								else if( wvtk == 2 )
+								else if( wvtk == 2 || wvtk == 4)
 								{
 									int ntet[6][4] =
 									{
@@ -579,7 +656,7 @@ int main(int argc, char *argv[])
 									};
 									for(int c = 0; c < 6; ++c)
 									{
-										fvtk << 4;
+										if( !vtu ) fvtk << 4; //for vtu goes to offsets
 										for(int q = 0; q < 4; ++q)
 											fvtk << " " << nvtx[ntet[c][q]];
 										fvtk << std::endl;
@@ -593,7 +670,49 @@ int main(int argc, char *argv[])
 			}
 		}
 		fvtk << std::endl;
-		fvtk << "CELL_TYPES " << ncells << std::endl;
+		if( vtu )
+		{
+			fvtk << "\t\t\t\t</DataArray>" << std::endl;
+			fvtk << "\t\t\t\t<DataArray type=\"Int64\" Name=\"offsets\" format=\"ascii\">" << std::endl;
+			size_t offset = 0;
+			for(int k = lnz; k < rnz; ++k)
+			{
+				for(int kr = 0; kr < refz; ++kr)
+				{
+					for(int j = lny; j < rny; ++j)
+					{
+						for(int jr = 0; jr < refy; ++jr)
+						{
+							for(int i = lnx; i < rnx; ++i)
+							{
+								for(int ir = 0; ir < refx; ++ir)
+								{
+									if( wvtk == 1 || wvtk == 3)
+									{
+										offset += 8;
+										fvtk << offset;
+										fvtk << std::endl;
+									}
+									else if( wvtk == 2 || wvtk == 4)
+									{
+										for(int c = 0; c < 6; ++c)
+										{
+											offset += 4;
+											fvtk << offset; 
+										}
+										fvtk << std::endl;
+										
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			fvtk << "\t\t\t\t</DataArray>" << std::endl;
+			fvtk << "\t\t\t\t<DataArray type=\"UInt8\" Name=\"types\" format=\"ascii\">" << std::endl;
+		}
+		else fvtk << "CELL_TYPES " << ncells << std::endl;
 		for(int k = lnz; k < rnz; ++k)
 		{
 			for(int kr = 0; kr < refz; ++kr)
@@ -608,7 +727,7 @@ int main(int argc, char *argv[])
 							{
 								int cells = 1;
 								int ctype = 12;
-								if( wvtk == 2 )
+								if( wvtk == 2 || wvtk == 4)
 								{
 									cells = 6;
 									ctype = 10;
@@ -622,13 +741,18 @@ int main(int argc, char *argv[])
 			}
 		}
 		fvtk << std::endl;
+		if( vtu )
+		{
+			fvtk << "\t\t\t\t</DataArray>" << std::endl;
+			fvtk << "\t\t\t</Cells>" << std::endl;
+		}
 		std::cout << "done with cells in VTK file" << std::endl;
 	}
 	
 	
 	std::cout << "Writing properties data." << std::endl;
 	
-	if( wvtk )
+	if( wvtk && !vtu )
 	{
 		size_t ncx = (rnx-lnx)*refx;
 		size_t ncy = (rny-lny)*refy;
@@ -637,6 +761,9 @@ int main(int argc, char *argv[])
 		if( wvtk == 2 ) ncells *= 6;
 		fvtk << "CELL_DATA " << ncells << std::endl;
 	}
+	
+	if( wvtk && vtu )
+		fvtk << "\t\t\t<CellData>" << std::endl;
 	
 	
 	std::ifstream fporo("spe_phi.dat");
@@ -691,8 +818,15 @@ int main(int argc, char *argv[])
 		if( wvtk )
 		{
 			std::cout << "write PORO to VTK file" << std::endl;
-			fvtk << "SCALARS PORO double" << std::endl;
-			fvtk << "LOOKUP_TABLE default" << std::endl;
+			if( vtu )
+			{
+				fvtk << "\t\t\t\t<DataArray Name=\"PORO\" NumberOfComponents=\"1\" type=\"Float64\" format=\"ascii\">" << std::endl;
+			}
+			else
+			{
+				fvtk << "SCALARS PORO double" << std::endl;
+				fvtk << "LOOKUP_TABLE default" << std::endl;
+			}
 			for(int k = 0; k < nz; ++k)
 			{
 				for(int kr = 0; kr < refz; ++kr)
@@ -716,6 +850,8 @@ int main(int argc, char *argv[])
 				}
 			}
 			fvtk << std::endl;
+			if( vtu )
+				fvtk << "\t\t\t\t</DataArray>" << std::endl;
 			std::cout << "done with PORO in VTK file" << std::endl;
 		}
 	}
@@ -822,8 +958,15 @@ int main(int argc, char *argv[])
 		if( wvtk )
 		{
 			std::cout << "write PERM to VTK file" << std::endl;
-			fvtk << "SCALARS PERM double 6" << std::endl;
-			fvtk << "LOOKUP_TABLE default" << std::endl;
+			if( vtu )
+			{
+				fvtk << "\t\t\t\t<DataArray Name=\"PERM\" NumberOfComponents=\"6\" type=\"Float64\" format=\"ascii\">" << std::endl;
+			}
+			else
+			{
+				fvtk << "SCALARS PERM double 6" << std::endl;
+				fvtk << "LOOKUP_TABLE default" << std::endl;
+			}
 			for(int k = 0; k < nz; ++k)
 			{
 				for(int kr = 0; kr < refz; ++kr)
@@ -851,6 +994,8 @@ int main(int argc, char *argv[])
 				}
 			}
 			fvtk << std::endl;
+			if( vtu )
+				fvtk << "\t\t\t\t</DataArray>" << std::endl;
 			std::cout << "done with PERM in VTK file" << std::endl;
 		}
 	}
@@ -859,6 +1004,13 @@ int main(int argc, char *argv[])
 	f.close();
 	if( wvtk )
 	{
+		if( vtu )
+		{
+			fvtk << "\t\t\t</CellData>" << std::endl;
+			fvtk << "\t\t</Piece>" << std::endl;
+			fvtk << "\t</UnstructuredGrid>" << std::endl;
+			fvtk << "</VTKFile>" << std::endl;
+		}
 		std::cout << "Closing VTK file" << std::endl;
 		fvtk.close();
 	}
