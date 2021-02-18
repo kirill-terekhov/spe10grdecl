@@ -19,10 +19,11 @@ void normalize(double n[3])
 	}
 }
 
-const double noind = std::numeric_limits<double>::quiet_NaN();
+//~ const double noind = std::numeric_limits<double>::quiet_NaN();
+const double noind = 0.0;
 int N = 128;
 #define ind(r,c) ((r)*N + (c))
-std::vector<double> map;
+
 
 void rand2d(double * arr, int N, int Nl, int Nr, int Nb, int Nt, double t)
 {
@@ -59,7 +60,7 @@ void init2d(double * arr, int N, double mint, double maxt)
 	arr[ind(N-1,N-1)] = mint+(rand()*1.0/RAND_MAX)*(maxt-mint);
 }
 
-double intrp2d(double * arr, int N, double x, double y)
+double intrp2d(const double * arr, int N, double x, double y)
 {
 	int n = ceil(x*(N-1));
 	int m = ceil(y*(N-1));
@@ -78,7 +79,7 @@ double intrp2d(double * arr, int N, double x, double y)
 	return (1-ky)*(lb*(1-kx) + rb*kx) + ky*(lt*(1-kx) + rt*kx);
 }
 
-double intrp2dx(double * arr, int N, double x, double y)
+double intrp2dx(const double * arr, int N, double x, double y)
 {
 	int n = ceil(x*(N-1));
 	int m = ceil(y*(N-1));
@@ -92,7 +93,7 @@ double intrp2dx(double * arr, int N, double x, double y)
 	return 0.5*((rt+rb) - (lt+lb))/dh;
 }
 
-double intrp2dy(double * arr, int N, double x, double y)
+double intrp2dy(const double * arr, int N, double x, double y)
 {
 	int n = ceil(x*(N-1));
 	int m = ceil(y*(N-1));
@@ -107,7 +108,7 @@ double intrp2dy(double * arr, int N, double x, double y)
 }
 
 
-void transform(double xyz[3], const double max[3], const double min[3], double & ztop, double & zbottom, double nrmtop[3], double nrmbottom[3])
+void transform(const std::vector<double> & map, double xyz[3], const double max[3], const double min[3], double & ztop, double & zbottom, double nrmtop[3], double nrmbottom[3])
 {
 	double x = (xyz[0]-min[0])/(max[0]-min[0]), y = (xyz[1]-min[1])/(max[1]-min[1]), z = (xyz[2]-min[2])/(max[2]-min[2]);
 	if( x < 0 || x > 1 ) {throw -1; std::cout << "x: " << x << " xyz " << xyz[0] << " " << xyz[1] << " " << xyz[2] << " unit " << x << " " << y << " " << z << " min " << min[0] << " " << min[1] << " " << min[2] << " max " << max[0] << " " << max[1] << " " << max[2] << std::endl;}
@@ -325,7 +326,7 @@ int main(int argc, char *argv[])
 	
 	if( argc > 2 ) deformation = atof(argv[2]);
 	
-	map.resize(N*N,0.0);
+	std::vector<double> map(N*N,0.0);
 	init2d(&map[0],N,0.0,deformation);
 	rand2d(&map[0],N,0,N-1,0,N-1,deformation*0.5);
 	
@@ -400,7 +401,7 @@ int main(int argc, char *argv[])
 					xyz[0] = 240.0 * (i * 1. * refx + ir) / ( 60.0 * refx);
 					xyz[1] = 440.0 * (j * 1. * refy + jr) / (220.0 * refy);
 					xyz[2] = 340.0 * 0.0 / 85.0;
-					transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+					transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 					changexyz(xyz,max,min,ztop,zbottom,xyzout);
 					f << xyzout[0] << " " << xyzout[1] << " " << xyzout[2];
 					f << " ";
@@ -408,7 +409,7 @@ int main(int argc, char *argv[])
 					xyz[0] = 240.0 * (i * 1. * refx + ir) / ( 60.0 * refx);
 					xyz[1] = 440.0 * (j * 1. * refy + jr) / (220.0 * refy);
 					xyz[2] = 340.0 * nz / 85.0;
-					transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+					transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 					changexyz(xyz,max,min,ztop,zbottom,xyzout);
 					f << xyzout[0] << " " << xyzout[1] << " " << xyzout[2];
 					f << std::endl;
@@ -458,7 +459,7 @@ int main(int argc, char *argv[])
 								xyz[0] = 240.0 * (i * 1. * refx + ir) / ( 60.0 * refx);
 								xyz[1] = 440.0 * (j * 1. * refy + jr) / (220.0 * refy);
 								xyz[2] = 340.0 * (k * 1. * refz + kr) / ( 85.0 * refz);
-								transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+								transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 								changexyz(xyz,max,min,ztop,zbottom,xyzout);
 								fvtk << xyzout[0] << " " << xyzout[1] << " " << xyzout[2] << std::endl;
 							}
@@ -498,12 +499,12 @@ int main(int argc, char *argv[])
 						{
 							//top near left corner
 							xyz[0] = 240.0 * (i * 1. * refx + ir) / (60.0 * refx);
-							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							//top near right corner
 							xyz[0] = 240.0 * (i * 1. * refx + ir + 1) / (60.0 * refx);
-							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							nout++;
@@ -519,12 +520,12 @@ int main(int argc, char *argv[])
 						{
 							// top far left corner
 							xyz[0] = 240.0 * (i * 1. * refx + ir) / (60.0 * refx);
-							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							// top far right corner
 							xyz[0] = 240.0 * (i * 1. * refx + ir + 1) / (60.0 * refx);
-							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							nout++;
@@ -548,12 +549,12 @@ int main(int argc, char *argv[])
 						{
 							//bottom near left corner
 							xyz[0] = 240.0 * (i * 1. * refx + ir) / (60.0 * refx);
-							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							//bottom near right corner
 							xyz[0] = 240.0 * (i * 1. * refx + ir + 1) / (60.0 * refx);
-							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							nout++;
@@ -569,12 +570,12 @@ int main(int argc, char *argv[])
 						{
 							//bottom far left corner
 							xyz[0] = 240.0 * (i * 1. * refx + ir) / (60.0 * refx);
-							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							//bottom far right corner
 							xyz[0] = 240.0 * (i * 1. * refx + ir + 1) / (60.0 * refx);
-							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							nout++;
@@ -610,7 +611,7 @@ int main(int argc, char *argv[])
 		if( vtu )
 		{
 			fvtk << "\t\t\t<Cells>" << std::endl;
-			fvtk << "\t\t\t\t<DataArray type=\"Int64\" Name=\"connectivity\" format=\"ascii\">" << std::endl;
+			fvtk << "\t\t\t\t<DataArray type=\"UInt64\" Name=\"connectivity\" format=\"ascii\">" << std::endl;
 		}
 		else fvtk << "CELLS " << ncells << " " << records << std::endl;
 		for(int k = lnz; k < rnz; ++k)
@@ -673,7 +674,7 @@ int main(int argc, char *argv[])
 		if( vtu )
 		{
 			fvtk << "\t\t\t\t</DataArray>" << std::endl;
-			fvtk << "\t\t\t\t<DataArray type=\"Int64\" Name=\"offsets\" format=\"ascii\">" << std::endl;
+			fvtk << "\t\t\t\t<DataArray type=\"UInt64\" Name=\"offsets\" format=\"ascii\">" << std::endl;
 			size_t offset = 0;
 			for(int k = lnz; k < rnz; ++k)
 			{
@@ -904,7 +905,7 @@ int main(int argc, char *argv[])
 						Kin[0] = perm[0][nout];
 						Kin[1] = perm[1][nout];
 						Kin[2] = perm[2][nout];
-						transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+						transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 						for(int l = 0; l < 3; ++l)
 							nrm[l] = (nrmtop[l]-nrmbottom[l])*(xyz[2]-min[2])/(max[2]-min[2]) + nrmbottom[l];
 						rotate_tensor(nrm,Kin,Kout);
