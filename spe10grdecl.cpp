@@ -19,8 +19,8 @@ void normalize(double n[3])
 	}
 }
 
-//~ const double noind = std::numeric_limits<double>::quiet_NaN();
-const double noind = 0.0;
+const double noind = std::numeric_limits<double>::quiet_NaN();
+//~ const double noind = 0.0;
 int N = 128;
 #define ind(r,c) ((r)*N + (c))
 
@@ -108,7 +108,7 @@ double intrp2dy(const double * arr, int N, double x, double y)
 }
 
 
-void transform(const std::vector<double> & map, double xyz[3], const double max[3], const double min[3], double & ztop, double & zbottom, double nrmtop[3], double nrmbottom[3])
+void transform(const double * map, double xyz[3], const double max[3], const double min[3], double & ztop, double & zbottom, double nrmtop[3], double nrmbottom[3])
 {
 	double x = (xyz[0]-min[0])/(max[0]-min[0]), y = (xyz[1]-min[1])/(max[1]-min[1]), z = (xyz[2]-min[2])/(max[2]-min[2]);
 	if( x < 0 || x > 1 ) {throw -1; std::cout << "x: " << x << " xyz " << xyz[0] << " " << xyz[1] << " " << xyz[2] << " unit " << x << " " << y << " " << z << " min " << min[0] << " " << min[1] << " " << min[2] << " max " << max[0] << " " << max[1] << " " << max[2] << std::endl;}
@@ -128,11 +128,11 @@ void transform(const std::vector<double> & map, double xyz[3], const double max[
 	//dztopdx = 0;
 	//dztopdy = 2*pi*std::cos(y*pi*2)*0.2;
 	
-	shift = intrp2d(&map[0],N,x,y);
+	shift = intrp2d(map,N,x,y);
 	zbottom = shift;
 	ztop = 1+shift;
-	dzbottomdx = dztopdx = intrp2dx(&map[0],N,x,y);
-	dzbottomdy = dztopdy = intrp2dy(&map[0],N,x,y);
+	dzbottomdx = dztopdx = intrp2dx(map,N,x,y);
+	dzbottomdy = dztopdy = intrp2dy(map,N,x,y);
 	
 	
 	
@@ -326,9 +326,10 @@ int main(int argc, char *argv[])
 	
 	if( argc > 2 ) deformation = atof(argv[2]);
 	
-	std::vector<double> map(N*N,0.0);
-	init2d(&map[0],N,0.0,deformation);
-	rand2d(&map[0],N,0,N-1,0,N-1,deformation*0.5);
+	double * map = new double[N*N];
+	std::fill(map,map+N*N,0.0);
+	init2d(map,N,0.0,deformation);
+	rand2d(map,N,0,N-1,0,N-1,deformation*0.5);
 	
 	if( argc > 3  ) lnx  = atoi(argv[3]);
 	if( argc > 4  ) rnx  = atoi(argv[4]);
@@ -785,6 +786,8 @@ int main(int argc, char *argv[])
 				for(int i = 0; i < nx; ++i)
 				{
 					fporo >> value;
+					value = std::max(value,1.0e-4);
+					value = std::min(value,1.0);
 					poro.push_back(value);
 				}
 			}
