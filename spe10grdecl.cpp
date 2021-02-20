@@ -19,7 +19,7 @@ void normalize(double n[3])
 	}
 }
 
-const double noind = std::numeric_limits<double>::quiet_NaN();
+const double noind = std::numeric_limits<double>::max();
 //~ const double noind = 0.0;
 int N = 128;
 #define ind(r,c) ((r)*N + (c))
@@ -42,10 +42,10 @@ void rand2d(double * arr, int N, int Nl, int Nr, int Nb, int Nt, double t)
 	double lt = arr[ind(Nt,Nl)];
 	double rt = arr[ind(Nt,Nr)];
 	if( lb != lb || rb != rb || lt != lt || rt != rt ) throw -1;
-	if( arr[ind(Nk,Nl)] != arr[ind(Nk,Nl)] ) arr[ind(Nk,Nl)] = 0.5*(lb + lt) + (2*(rand()*1.0/RAND_MAX)-1)*t;
-	if( arr[ind(Nk,Nr)] != arr[ind(Nk,Nr)] ) arr[ind(Nk,Nr)] = 0.5*(rb + rt) + (2*(rand()*1.0/RAND_MAX)-1)*t;
-	if( arr[ind(Nb,Nm)] != arr[ind(Nb,Nm)] ) arr[ind(Nb,Nm)] = 0.5*(lb + rb) + (2*(rand()*1.0/RAND_MAX)-1)*t;
-	if( arr[ind(Nt,Nm)] != arr[ind(Nt,Nm)] ) arr[ind(Nt,Nm)] = 0.5*(lt + rt) + (2*(rand()*1.0/RAND_MAX)-1)*t;
+	if( arr[ind(Nk,Nl)] == noind ) arr[ind(Nk,Nl)] = 0.5*(lb + lt) + (2*(rand()*1.0/RAND_MAX)-1)*t;
+	if( arr[ind(Nk,Nr)] == noind ) arr[ind(Nk,Nr)] = 0.5*(rb + rt) + (2*(rand()*1.0/RAND_MAX)-1)*t;
+	if( arr[ind(Nb,Nm)] == noind ) arr[ind(Nb,Nm)] = 0.5*(lb + rb) + (2*(rand()*1.0/RAND_MAX)-1)*t;
+	if( arr[ind(Nt,Nm)] == noind ) arr[ind(Nt,Nm)] = 0.5*(lt + rt) + (2*(rand()*1.0/RAND_MAX)-1)*t;
 	arr[ind(Nk,Nm)] = 0.25*(lb+rb+lt+rt) + (2*(rand()*1.0/RAND_MAX)-1)*t;
 	rand2d(arr,N,Nl,Nm,Nb,Nk,t*0.5); rand2d(arr,N,Nm,Nr,Nb,Nk,t*0.5);
 	rand2d(arr,N,Nl,Nm,Nk,Nt,t*0.5); rand2d(arr,N,Nm,Nr,Nk,Nt,t*0.5);
@@ -62,8 +62,8 @@ void init2d(double * arr, int N, double mint, double maxt)
 
 double intrp2d(const double * arr, int N, double x, double y)
 {
-	int n = ceil(x*(N-1));
-	int m = ceil(y*(N-1));
+	int n = (int)ceil(x*(N-1));
+	int m = (int)ceil(y*(N-1));
 	if( n == 0 ) n = 1;
 	if( m == 0 ) m = 1;
 	double dh = 1.0/(double)(N-1);
@@ -81,8 +81,8 @@ double intrp2d(const double * arr, int N, double x, double y)
 
 double intrp2dx(const double * arr, int N, double x, double y)
 {
-	int n = ceil(x*(N-1));
-	int m = ceil(y*(N-1));
+	int n = (int)ceil(x*(N-1));
+	int m = (int)ceil(y*(N-1));
 	if( n == 0 ) n = 1;
 	if( m == 0 ) m = 1;
 	double dh = 1.0/(double)(N-1);
@@ -95,8 +95,8 @@ double intrp2dx(const double * arr, int N, double x, double y)
 
 double intrp2dy(const double * arr, int N, double x, double y)
 {
-	int n = ceil(x*(N-1));
-	int m = ceil(y*(N-1));
+	int n = (int)ceil(x*(N-1));
+	int m = (int)ceil(y*(N-1));
 	if( n == 0 ) n = 1;
 	if( m == 0 ) m = 1;
 	double dh = 1.0/(double)(N-1);
@@ -317,7 +317,7 @@ int main(int argc, char *argv[])
 	double value, ztop, zbottom, xyz[3], xyzout[3], nrmtop[3], nrmbottom[3], nrm[3], Kin[3], Kout[6];
 	double max[3] = {240,440,340}, min[3] = {0,0,0};
 	double deformation = 0.5;
-	int nx = 60, ny = 220, nz = 85, m;
+	int nx = 60, ny = 220, nz = 85;
 	int lnx = 0, lny = 0, lnz = 0;
 	int rnx = nx, rny = ny, rnz = nz;
 	int refx = 1, refy = 1, refz = 1;
@@ -930,7 +930,7 @@ int main(int argc, char *argv[])
 		for(int l = 0; l < 6; ++l)
 		{
 			f << "PERM" << c1[l] << c2[l] << std::endl;
-			m = nout = 0;
+			nout = 0;
 			for(int k = 0; k < nz; ++k)
 			{
 				for(int kr = 0; kr < refz; ++kr)
