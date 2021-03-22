@@ -259,46 +259,13 @@ void rotate_tensor(double nrm[3], const double Kin[3], double Kout[6])
 	Kout[4] = prod[5];
 	Kout[5] = prod[8];
 }
-/*
-void write_points_vtk(int lnx, int rnx, int refx,
-					  int lny, int rny, int refy,
-					  int lnz, int rnz, int refz,
-					  double max[3], double min[3])
-{
-	double ztop, double zbottom, xyzout[3], xyz[3], nrmtop[3], nrmbottom[3];
-	for(int k = lnz; k <= rnz; ++k)
-	{
-		for(int kr = 0; kr < (k < rnz ? refz : 1); ++kr)
-		{
-			for(int j = lny; j <= rny; ++j)
-			{
-				for(int jr = 0; jr < (j < rny ? refy : 1); jr++)
-				{
-					for(int i = lnx; i <= rnx; ++i)
-					{
-						for(int ir = 0; ir < (i < rnx ? refx : 1); ir++)
-						{
-							//bottom point
-							xyz[0] = 240.0 * (i * refx + ir) / ( 60.0 * refx);
-							xyz[1] = 440.0 * (j * refy + jr) / (220.0 * refy);
-							xyz[2] = 340.0 * (k * refz + kr) / ( 85.0 * refz);
-							transform(xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
-							changexyz(xyz,max,min,ztop,zbottom,xyzout);
-							fvtk << xyzout[0] << " " << xyzout[1] << " " << xyzout[2] << std::endl;
-						}
-					}
-				}
-			}
-		}
-	}
-}
-*/
+
 int main(int argc, char *argv[]) 
 {
 	if (argc < 2)
 	{
 		std::cout << "Usage: " << argv[0] ;
-		std::cout << " output.grdecl [deformation=0.5] [lnx=0 rnx=60 lny=0 rny=220 lnz=0 rnz=85] [refine_x=1] [refine_y=1] [refine_z=1] [write_vtk=1(1:hex,2:tet,3:hex(vtu),4:tet(vtu))]" << std::endl;
+		std::cout << " output.grdecl [deformation=0.5] [lnx=0 rnx=60 lny=0 rny=220 lnz=0 rnz=85] [refine_x=1] [refine_y=1] [refine_z=1] [write_vtk=1(1:hex,2:tet,3:hex(vtu),4:tet(vtu))] [scale_x = 1] [scale_y = 1] [scale_z = 1]" << std::endl;
 		return -1;
 	}
 
@@ -315,7 +282,8 @@ int main(int argc, char *argv[])
 	
 	
 	double value, ztop, zbottom, xyz[3], xyzout[3], nrmtop[3], nrmbottom[3], nrm[3], Kin[3], Kout[6];
-	double max[3] = {240,440,340}, min[3] = {0,0,0};
+	double scalex = 1, scaley = 1, scalez = 1;
+	double max[3] = {240*scalex,440*scaley,340*scalez}, min[3] = {0,0,0};
 	double deformation = 0.5;
 	int nx = 60, ny = 220, nz = 85, m;
 	int lnx = 0, lny = 0, lnz = 0;
@@ -341,6 +309,9 @@ int main(int argc, char *argv[])
 	if( argc > 10 ) refy = atoi(argv[10]);
 	if( argc > 11 ) refz = atoi(argv[11]);
 	if( argc > 12 ) wvtk = atoi(argv[12]);
+	if( argc > 13 ) scalex = atof(argv[13]);
+	if( argc > 14 ) scaley = atof(argv[14]);
+	if( argc > 15 ) scalez = atof(argv[15]);
 	
 	if( wvtk )
 	{
@@ -399,17 +370,17 @@ int main(int argc, char *argv[])
 				for(int ir = 0; ir < (i < rnx ? refx : 1); ir++)
 				{
 					//bottom point
-					xyz[0] = 240.0 * (i * 1. * refx + ir) / ( 60.0 * refx);
-					xyz[1] = 440.0 * (j * 1. * refy + jr) / (220.0 * refy);
-					xyz[2] = 340.0 * 0.0 / 85.0;
+					xyz[0] = 240.0 * scalex * (i * 1. * refx + ir) / ( 60.0 * refx);
+					xyz[1] = 440.0 * scaley * (j * 1. * refy + jr) / (220.0 * refy);
+					xyz[2] = 340.0 * scalez * 0.0 / 85.0;
 					transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 					changexyz(xyz,max,min,ztop,zbottom,xyzout);
 					f << xyzout[0] << " " << xyzout[1] << " " << xyzout[2];
 					f << " ";
 					//top point
-					xyz[0] = 240.0 * (i * 1. * refx + ir) / ( 60.0 * refx);
-					xyz[1] = 440.0 * (j * 1. * refy + jr) / (220.0 * refy);
-					xyz[2] = 340.0 * nz / 85.0;
+					xyz[0] = 240.0 * scalex * (i * 1. * refx + ir) / ( 60.0 * refx);
+					xyz[1] = 440.0 * scaley * (j * 1. * refy + jr) / (220.0 * refy);
+					xyz[2] = 340.0 * scalez * nz / 85.0;
 					transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 					changexyz(xyz,max,min,ztop,zbottom,xyzout);
 					f << xyzout[0] << " " << xyzout[1] << " " << xyzout[2];
@@ -457,9 +428,9 @@ int main(int argc, char *argv[])
 							for(int ir = 0; ir < (i < rnx ? refx : 1); ir++)
 							{
 								//bottom point
-								xyz[0] = 240.0 * (i * 1. * refx + ir) / ( 60.0 * refx);
-								xyz[1] = 440.0 * (j * 1. * refy + jr) / (220.0 * refy);
-								xyz[2] = 340.0 * (k * 1. * refz + kr) / ( 85.0 * refz);
+								xyz[0] = 240.0 * scalex * (i * 1. * refx + ir) / ( 60.0 * refx);
+								xyz[1] = 440.0 * scaley * (j * 1. * refy + jr) / (220.0 * refy);
+								xyz[2] = 340.0 * scalez * (k * 1. * refz + kr) / ( 85.0 * refz);
 								transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 								changexyz(xyz,max,min,ztop,zbottom,xyzout);
 								fvtk << xyzout[0] << " " << xyzout[1] << " " << xyzout[2] << std::endl;
@@ -487,24 +458,24 @@ int main(int argc, char *argv[])
 		for(int kr = 0; kr < refz; ++kr)
 		{
 			//top corners
-			xyz[2] = 340.0 * (k * 1. * refz + kr) / (85.0 * refz);
+			xyz[2] = 340.0 * scalez * (k * 1. * refz + kr) / (85.0 * refz);
 			for(int j = lny; j < rny; ++j)
 			{
 				for(int jr = 0; jr < refy; ++jr)
 				{
-					xyz[1] = 440.0 * (j * 1. * refy + jr) / (220.0 * refy);
+					xyz[1] = 440.0 * scaley * (j * 1. * refy + jr) / (220.0 * refy);
 					//top corners, near left and near right
 					for(int i = lnx; i < rnx; ++i)
 					{
 						for(int ir = 0; ir < refx; ++ir)
 						{
 							//top near left corner
-							xyz[0] = 240.0 * (i * 1. * refx + ir) / (60.0 * refx);
+							xyz[0] = 240.0 * scalex * (i * 1. * refx + ir) / (60.0 * refx);
 							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							//top near right corner
-							xyz[0] = 240.0 * (i * 1. * refx + ir + 1) / (60.0 * refx);
+							xyz[0] = 240.0 * scalex * (i * 1. * refx + ir + 1) / (60.0 * refx);
 							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
@@ -513,19 +484,19 @@ int main(int argc, char *argv[])
 								f << std::endl;
 						}
 					}
-					xyz[1] = 440.0 * (j * 1. * refy + jr + 1) / (220.0 * refy);
+					xyz[1] = 440.0 * scaley * (j * 1. * refy + jr + 1) / (220.0 * refy);
 					//top corners, far left and far right
 					for(int i = lnx; i < rnx; ++i)
 					{
 						for(int ir = 0; ir < refx; ++ir)
 						{
 							// top far left corner
-							xyz[0] = 240.0 * (i * 1. * refx + ir) / (60.0 * refx);
+							xyz[0] = 240.0 * scalex * (i * 1. * refx + ir) / (60.0 * refx);
 							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							// top far right corner
-							xyz[0] = 240.0 * (i * 1. * refx + ir + 1) / (60.0 * refx);
+							xyz[0] = 240.0 * scalex * (i * 1. * refx + ir + 1) / (60.0 * refx);
 							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
@@ -536,25 +507,25 @@ int main(int argc, char *argv[])
 					}
 				}
 			}
-			xyz[2] = 340.0 * (k * 1. * refz + kr + 1) / (85.0 * refz);
+			xyz[2] = 340.0 * scalez * (k * 1. * refz + kr + 1) / (85.0 * refz);
 			//bottom corners 
 			for(int j = lny; j < rny; ++j)
 			{
 				for(int jr = 0; jr < refy; ++jr)
 				{
-					xyz[1] = 440.0 * (j * 1. * refy + jr) / (220.0 * refy);
+					xyz[1] = 440.0 * scaley * (j * 1. * refy + jr) / (220.0 * refy);
 					//top corners, near left and near right
 					for(int i = lnx; i < rnx; ++i)
 					{
 						for(int ir = 0; ir < refx; ++ir)
 						{
 							//bottom near left corner
-							xyz[0] = 240.0 * (i * 1. * refx + ir) / (60.0 * refx);
+							xyz[0] = 240.0 * scalex * (i * 1. * refx + ir) / (60.0 * refx);
 							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							//bottom near right corner
-							xyz[0] = 240.0 * (i * 1. * refx + ir + 1) / (60.0 * refx);
+							xyz[0] = 240.0 * scalex * (i * 1. * refx + ir + 1) / (60.0 * refx);
 							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
@@ -563,19 +534,19 @@ int main(int argc, char *argv[])
 								f << std::endl;
 						}
 					}
-					xyz[1] = 440.0 * (j * 1. * refy + jr + 1) / (220.0 * refy);
+					xyz[1] = 440.0 * scaley * (j * 1. * refy + jr + 1) / (220.0 * refy);
 					//top corners, far left and far right
 					for(int i = lnx; i < rnx; ++i)
 					{
 						for(int ir = 0; ir < refx; ++ir)
 						{
 							//bottom far left corner
-							xyz[0] = 240.0 * (i * 1. * refx + ir) / (60.0 * refx);
+							xyz[0] = 240.0 * scalex * (i * 1. * refx + ir) / (60.0 * refx);
 							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
 							//bottom far right corner
-							xyz[0] = 240.0 * (i * 1. * refx + ir + 1) / (60.0 * refx);
+							xyz[0] = 240.0 * scalex * (i * 1. * refx + ir + 1) / (60.0 * refx);
 							transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
 							changexyz(xyz,max,min,ztop,zbottom,xyzout);
 							f << xyzout[2] << " ";
@@ -902,9 +873,9 @@ int main(int argc, char *argv[])
 						j >= lny && j < rny &&
 						k >= lnz && k < rnz )
 					{
-						xyz[0] = 240.0 * (i+0.5) / 60.0;
-						xyz[1] = 440.0 * (j+0.5) / 220.0;
-						xyz[2] = 340.0 * (k+0.5) / 85.0;
+						xyz[0] = 240.0 * scalex * (i+0.5) / 60.0;
+						xyz[1] = 440.0 * scaley * (j+0.5) / 220.0;
+						xyz[2] = 340.0 * scalez * (k+0.5) / 85.0;
 						Kin[0] = perm[0][nout];
 						Kin[1] = perm[1][nout];
 						Kin[2] = perm[2][nout];
