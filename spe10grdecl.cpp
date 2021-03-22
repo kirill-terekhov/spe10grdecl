@@ -283,7 +283,6 @@ int main(int argc, char *argv[])
 	
 	double value, ztop, zbottom, xyz[3], xyzout[3], nrmtop[3], nrmbottom[3], nrm[3], Kin[3], Kout[6];
 	double scalex = 1, scaley = 1, scalez = 1;
-	double max[3] = {240*scalex,440*scaley,340*scalez}, min[3] = {0,0,0};
 	double deformation = 0.5;
 	int nx = 60, ny = 220, nz = 85;
 	int lnx = 0, lny = 0, lnz = 0;
@@ -312,6 +311,8 @@ int main(int argc, char *argv[])
 	if( argc > 13 ) scalex = atof(argv[13]);
 	if( argc > 14 ) scaley = atof(argv[14]);
 	if( argc > 15 ) scalez = atof(argv[15]);
+	
+	double max[3] = {240*scalex,440*scaley,340*scalez}, min[3] = {0,0,0};
 	
 	if( wvtk )
 	{
