@@ -24,6 +24,22 @@ const double noind = std::numeric_limits<double>::max();
 int N = 128;
 #define ind(r,c) ((r)*N + (c))
 
+int wrap(int i, int n)
+{
+	if ((i / n) % 2 == 0)
+		return i % n;
+	else
+		return n - 1 - i%n;
+}
+
+double wrapx(double x)
+{
+	if (((int)floor(x))%2 == 0) 
+		return x - floor(x);
+	else 
+		return 1.0 - (x - floor(x));
+}
+
 
 void rand2d(double * arr, int N, int Nl, int Nr, int Nb, int Nt, double t)
 {
@@ -111,6 +127,9 @@ double intrp2dy(const double * arr, int N, double x, double y)
 void transform(const double * map, double xyz[3], const double max[3], const double min[3], double & ztop, double & zbottom, double nrmtop[3], double nrmbottom[3])
 {
 	double x = (xyz[0]-min[0])/(max[0]-min[0]), y = (xyz[1]-min[1])/(max[1]-min[1]), z = (xyz[2]-min[2])/(max[2]-min[2]);
+	x = wrapx(x);
+	y = wrapx(y);
+	z = wrapx(z);
 	if( x < 0 || x > 1 ) {throw -1; std::cout << "x: " << x << " xyz " << xyz[0] << " " << xyz[1] << " " << xyz[2] << " unit " << x << " " << y << " " << z << " min " << min[0] << " " << min[1] << " " << min[2] << " max " << max[0] << " " << max[1] << " " << max[2] << std::endl;}
 	if( y < 0 || y > 1 ) std::cout << "y: " << y << " xyz " << xyz[0] << " " << xyz[1] << " " << xyz[2] << " unit " << x << " " << y << " " << z << " min " << min[0] << " " << min[1] << " " << min[2] << " max " << max[0] << " " << max[1] << " " << max[2] << std::endl;
 	if( z < 0 || z > 1 ) std::cout << "z: " << z << " xyz " << xyz[0] << " " << xyz[1] << " " << xyz[2] << " unit " << x << " " << y << " " << z << " min " << min[0] << " " << min[1] << " " << min[2] << " max " << max[0] << " " << max[1] << " " << max[2] << std::endl;
@@ -739,6 +758,9 @@ int main(int argc, char *argv[])
 	if( wvtk && vtu )
 		fvtk << "\t\t\t<CellData>" << std::endl;
 	
+	int nnz = ceil(rnz / nz);
+	int nny = ceil(rny / ny);
+	int nnx = ceil(rnx / nx);
 	
 	std::ifstream fporo("spe_phi.dat");
 	if( fporo.fail() ) 
@@ -765,20 +787,20 @@ int main(int argc, char *argv[])
 			}
 		}
 		fporo.close();
-		for(int k = 0; k < nz; ++k)
+		for(int k = 0; k < nz*nnz; ++k)
 		{
 			for(int kr = 0; kr < refz; ++kr)
-			for(int j = 0; j < ny; ++j)
+			for(int j = 0; j < ny*nny; ++j)
 			{
 				for(int jr = 0; jr < refy; ++jr)
-				for(int i = 0; i < nx; ++i)
+				for(int i = 0; i < nx*nnx; ++i)
 				{
 					for(int ir = 0; ir < refx; ++ir)
 					if( i >= lnx && i < rnx &&
 						j >= lny && j < rny &&
 						k >= lnz && k < rnz )
 					{
-						int ind = i + j * nx + k * nx*ny;
+						int ind = wrap(i,nx) + wrap(j,ny) * nx + wrap(k,nz) * nx*ny;
 						f << poro[ind] << " ";
 						nout++;
 						if( nout % 10 == 0 ) 
@@ -803,20 +825,20 @@ int main(int argc, char *argv[])
 				fvtk << "SCALARS PORO double" << std::endl;
 				fvtk << "LOOKUP_TABLE default" << std::endl;
 			}
-			for(int k = 0; k < nz; ++k)
+			for(int k = 0; k < nz*nnz; ++k)
 			{
 				for(int kr = 0; kr < refz; ++kr)
-				for(int j = 0; j < ny; ++j)
+				for(int j = 0; j < ny*nny; ++j)
 				{
 					for(int jr = 0; jr < refy; ++jr)
-					for(int i = 0; i < nx; ++i)
+					for(int i = 0; i < nx*nnx; ++i)
 					{
 						for(int ir = 0; ir < refx; ++ir)
 						if( i >= lnx && i < rnx &&
 							j >= lny && j < rny &&
 							k >= lnz && k < rnz )
 						{
-							int ind = i + j * nx + k * nx*ny;
+							int ind = wrap(i,nx) + wrap(j,ny) * nx + wrap(k,nz) * nx*ny;
 							int cells = 1;
 							if( wvtk == 2 ) cells = 6;
 							for(int q = 0; q < cells; ++q)
@@ -870,25 +892,18 @@ int main(int argc, char *argv[])
 			{
 				for(int i = 0; i < nx; ++i)
 				{
-					if( i >= lnx && i < rnx &&
-						j >= lny && j < rny &&
-						k >= lnz && k < rnz )
-					{
-						xyz[0] = 240.0 * scalex * (i+0.5) / 60.0;
-						xyz[1] = 440.0 * scaley * (j+0.5) / 220.0;
-						xyz[2] = 340.0 * scalez * (k+0.5) / 85.0;
-						Kin[0] = perm[0][nout];
-						Kin[1] = perm[1][nout];
-						Kin[2] = perm[2][nout];
-						transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
-						for(int l = 0; l < 3; ++l)
-							nrm[l] = (nrmtop[l]-nrmbottom[l])*(xyz[2]-min[2])/(max[2]-min[2]) + nrmbottom[l];
-						rotate_tensor(nrm,Kin,Kout);
-						for(int l = 0; l < 6; ++l)
-							permnew[l].push_back(Kout[l]);
-					}
-					else for(int l = 0; l < 6; ++l)
-						permnew[l].push_back(0.0);
+					xyz[0] = 240.0 * scalex * (i+0.5) / 60.0;
+					xyz[1] = 440.0 * scaley * (j+0.5) / 220.0;
+					xyz[2] = 340.0 * scalez * (k+0.5) / 85.0;
+					Kin[0] = perm[0][nout];
+					Kin[1] = perm[1][nout];
+					Kin[2] = perm[2][nout];
+					transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
+					for(int l = 0; l < 3; ++l)
+						nrm[l] = (nrmtop[l]-nrmbottom[l])*(xyz[2]-min[2])/(max[2]-min[2]) + nrmbottom[l];
+					rotate_tensor(nrm,Kin,Kout);
+					for(int l = 0; l < 6; ++l)
+						permnew[l].push_back(Kout[l]);
 					nout++;
 				}
 			}
@@ -903,20 +918,20 @@ int main(int argc, char *argv[])
 		{
 			f << "PERM" << c1[l] << c2[l] << std::endl;
 			nout = 0;
-			for(int k = 0; k < nz; ++k)
+			for(int k = 0; k < nz*nnz; ++k)
 			{
 				for(int kr = 0; kr < refz; ++kr)
-				for(int j = 0; j < ny; ++j)
+				for(int j = 0; j < ny*nny; ++j)
 				{
 					for(int jr = 0; jr < refy; ++jr)
-					for(int i = 0; i < nx; ++i)
+					for(int i = 0; i < nx*nnx; ++i)
 					{
 						for(int ir = 0; ir < refx; ++ir)
 						if( i >= lnx && i < rnx &&
 							j >= lny && j < rny &&
 							k >= lnz && k < rnz )
 						{
-							int ind = i + j * nx + k * nx*ny;
+							int ind = wrap(i,nx) + wrap(j,ny) * nx + wrap(k,nz) * nx*ny;
 							f << permnew[l][ind] << " ";
 							nout++;
 							if( nout % 10 == 0 ) 
@@ -943,20 +958,20 @@ int main(int argc, char *argv[])
 				fvtk << "SCALARS PERM double 6" << std::endl;
 				fvtk << "LOOKUP_TABLE default" << std::endl;
 			}
-			for(int k = 0; k < nz; ++k)
+			for(int k = 0; k < nz*nnz; ++k)
 			{
 				for(int kr = 0; kr < refz; ++kr)
-				for(int j = 0; j < ny; ++j)
+				for(int j = 0; j < ny*nny; ++j)
 				{
 					for(int jr = 0; jr < refy; ++jr)
-					for(int i = 0; i < nx; ++i)
+					for(int i = 0; i < nx*nnx; ++i)
 					{
 						for(int ir = 0; ir < refx; ++ir)
 						if( i >= lnx && i < rnx &&
 							j >= lny && j < rny &&
 							k >= lnz && k < rnz )
 						{
-							int ind = i + j * nx + k * nx*ny;
+							int ind = wrap(i,nx) + wrap(j,ny) * nx + wrap(k,nz) * nx*ny;
 							int cells = 1;
 							if( wvtk == 2 ) cells = 6;
 							for(int q = 0; q < cells; ++q)
