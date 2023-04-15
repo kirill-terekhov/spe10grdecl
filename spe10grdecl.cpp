@@ -3,6 +3,7 @@
 #include <cmath>
 #include <vector>
 #include <limits>
+#include <iomanip>
 
 
 const double pi = 3.14159265359;
@@ -284,7 +285,14 @@ int main(int argc, char *argv[])
 	if (argc < 2)
 	{
 		std::cout << "Usage: " << argv[0] ;
-		std::cout << " output.grdecl [deformation=0.5] [lnx=0 rnx=60 lny=0 rny=220 lnz=0 rnz=85] [refine_x=1] [refine_y=1] [refine_z=1] [write_vtk=1(1:hex,2:tet,3:hex(vtu),4:tet(vtu))] [scale_x = 1] [scale_y = 1] [scale_z = 1] [write_ecl=1]" << std::endl;
+		std::cout << " output.grdecl [deformation=0.5]";
+		std::cout << " [lnx=0] [rnx=60] [lny=0] [rny=220] [lnz=0] [rnz=85]";
+		std::cout << " [refine_x=1] [refine_y=1] [refine_z=1]";
+		std::cout << " [write_vtk=1(1:hex,2:tet,3:hex(vtu),4:tet(vtu))]";
+		std::cout << " [scale_x=1] [scale_y=1] [scale_z=1]";
+		std::cout << " [write_ecl=1] [permt=0(0:original;1:rotated;2:scalar)]";
+		std::cout << " [prec=-1]";
+		std::cout << std::endl;
 		return -1;
 	}
 
@@ -304,6 +312,8 @@ int main(int argc, char *argv[])
 	size_t nout = 0;
 	bool vtu = false;
 	bool wecl = true;
+	int permt = 0;
+	int prec = 0;
 	
 	if( argc > 2 ) deformation = atof(argv[2]);
 	
@@ -312,20 +322,22 @@ int main(int argc, char *argv[])
 	init2d(map,N,0.0,deformation);
 	rand2d(map,N,0,N-1,0,N-1,deformation*0.5);
 	
-	if( argc > 3  ) lnx  = atoi(argv[3]);
-	if( argc > 4  ) rnx  = atoi(argv[4]);
-	if( argc > 5  ) lny  = atoi(argv[5]);
-	if( argc > 6  ) rny  = atoi(argv[6]);
-	if( argc > 7  ) lnz  = atoi(argv[7]);
-	if( argc > 8  ) rnz  = atoi(argv[8]);
-	if( argc > 9  ) refx = atoi(argv[9]);
-	if( argc > 10 ) refy = atoi(argv[10]);
-	if( argc > 11 ) refz = atoi(argv[11]);
-	if( argc > 12 ) wvtk = atoi(argv[12]);
+	if( argc > 3  ) lnx    = atoi(argv[3]);
+	if( argc > 4  ) rnx    = atoi(argv[4]);
+	if( argc > 5  ) lny    = atoi(argv[5]);
+	if( argc > 6  ) rny    = atoi(argv[6]);
+	if( argc > 7  ) lnz    = atoi(argv[7]);
+	if( argc > 8  ) rnz    = atoi(argv[8]);
+	if( argc > 9  ) refx   = atoi(argv[9]);
+	if( argc > 10 ) refy   = atoi(argv[10]);
+	if( argc > 11 ) refz   = atoi(argv[11]);
+	if( argc > 12 ) wvtk   = atoi(argv[12]);
 	if( argc > 13 ) scalex = atof(argv[13]);
 	if( argc > 14 ) scaley = atof(argv[14]);
 	if( argc > 15 ) scalez = atof(argv[15]);
-	if (argc > 16) wecl = atoi(argv[16]);
+	if( argc > 16 ) wecl   = atoi(argv[16]);
+	if( argc > 17 ) permt  = atoi(argv[17]);
+	if( argc > 18 ) prec   = atoi(argv[18]);
 	
 	double max[3] = {240*scalex,440*scaley,340*scalez}, min[3] = {0,0,0};
 
@@ -338,6 +350,8 @@ int main(int argc, char *argv[])
 			std::cout << "Cannot open " << argv[1] << " for writing!" << std::endl;
 			return -1;
 		}
+		if (prec > 0)
+			f << std::setprecision(prec);
 	}
 
 	
@@ -372,6 +386,8 @@ int main(int argc, char *argv[])
 			fvtk << "ASCII" << std::endl;
 			fvtk << "DATASET UNSTRUCTURED_GRID" << std::endl;
 		}
+		if (prec > 0)
+			fvtk << std::setprecision(prec);
 	}
 	
 	std::cout << "intervals x " << lnx << ":" << rnx << " y " << lny << ":" << rny << " " << lnz << ":" << rnz << std::endl;
@@ -793,7 +809,7 @@ int main(int argc, char *argv[])
 				for (int i = 0; i < nx; ++i)
 				{
 					fporo >> value;
-					value = std::max(value, 1.0e-4);
+					//value = std::max(value, 1.0e-4);
 					value = std::min(value, 1.0);
 					poro.push_back(value);
 				}
@@ -883,14 +899,14 @@ int main(int argc, char *argv[])
 	else
 	{
 		std::vector<double> perm[3], permnew[6];
-		for(int l = 0; l < 3; ++l)
+		for (int l = 0; l < 3; ++l)
 		{
-			perm[l].reserve(nz*ny*nx);
-			for(int k = 0; k < nz; ++k)
+			perm[l].reserve(nz * ny * nx);
+			for (int k = 0; k < nz; ++k)
 			{
-				for(int j = 0; j < ny; ++j)
+				for (int j = 0; j < ny; ++j)
 				{
-					for(int i = 0; i < nx; ++i)
+					for (int i = 0; i < nx; ++i)
 					{
 						fperm >> value;
 						perm[l].push_back(value);
@@ -899,44 +915,56 @@ int main(int argc, char *argv[])
 			}
 		}
 		fperm.close();
-		
-		for(int l = 0; l < 6; ++l)
-			permnew[l].reserve(nz*ny*nz);
-		
-		nout = 0;
-		for(int k = 0; k < nz; ++k)
+
+		if (permt == 1)
 		{
-			for(int j = 0; j < ny; ++j)
+			for (int l = 0; l < 6; ++l)
+				permnew[l].reserve(nx * ny * nz);
+
+			nout = 0;
+			for (int k = 0; k < nz; ++k)
 			{
-				for(int i = 0; i < nx; ++i)
+				for (int j = 0; j < ny; ++j)
 				{
-					xyz[0] = 240.0 * scalex * (i+0.5) / 60.0;
-					xyz[1] = 440.0 * scaley * (j+0.5) / 220.0;
-					xyz[2] = 340.0 * scalez * (k+0.5) / 85.0;
-					Kin[0] = perm[0][nout];
-					Kin[1] = perm[1][nout];
-					Kin[2] = perm[2][nout];
-					transform(map,xyz,max,min,ztop,zbottom,nrmtop,nrmbottom);
-					for(int l = 0; l < 3; ++l)
-						nrm[l] = (nrmtop[l]-nrmbottom[l])*(xyz[2]-min[2])/(max[2]-min[2]) + nrmbottom[l];
-					rotate_tensor(nrm,Kin,Kout);
-					for(int l = 0; l < 6; ++l)
-						permnew[l].push_back(Kout[l]);
-					nout++;
+					for (int i = 0; i < nx; ++i)
+					{
+						xyz[0] = 240.0 * scalex * (i + 0.5) / 60.0;
+						xyz[1] = 440.0 * scaley * (j + 0.5) / 220.0;
+						xyz[2] = 340.0 * scalez * (k + 0.5) / 85.0;
+						Kin[0] = perm[0][nout];
+						Kin[1] = perm[1][nout];
+						Kin[2] = perm[2][nout];
+						transform(map, xyz, max, min, ztop, zbottom, nrmtop, nrmbottom);
+						for (int l = 0; l < 3; ++l)
+							nrm[l] = (nrmtop[l] - nrmbottom[l]) * (xyz[2] - min[2]) / (max[2] - min[2]) + nrmbottom[l];
+						rotate_tensor(nrm, Kin, Kout);
+						for (int l = 0; l < 6; ++l)
+							permnew[l].push_back(Kout[l]);
+						nout++;
+					}
 				}
 			}
 		}
-		
+
+		const int nl[3] = { 3,6,1 };
 		if (wecl)
 		{
-			f << "MPFA" << std::endl;
-			f << 1 << " " << 0 << std::endl; // define tensor in x,y,z coords and use TPFA
-			f << "/" << std::endl;
+			if (permt == 1)
+			{
+				f << "MPFA" << std::endl;
+				f << 1 << " " << 0 << std::endl; // define tensor in x,y,z coords and use TPFA
+				f << "/" << std::endl;
+			}
 			const char c1[6] = { 'X','X','X','Y','Y','Z' };
 			const char c2[6] = { 'X','Y','Z','Y','Z','Z' };
-			for (int l = 0; l < 6; ++l)
+			for (int l = 0; l < nl[permt]; ++l)
 			{
-				f << "PERM" << c1[l] << c2[l] << std::endl;
+				if( permt == 0 )
+					f << "PERM" << c2[l] << std::endl;
+				else if( permt == 1 )
+					f << "PERM" << c1[l] << c2[l] << std::endl;
+				else if( permt == 2 ) 
+					f << "PERM" << std::endl;
 				nout = 0;
 				for (int k = 0; k < nz * nnz; ++k)
 				{
@@ -952,7 +980,12 @@ int main(int argc, char *argv[])
 											k >= lnz && k < rnz)
 										{
 											int ind = wrap(i, nx) + wrap(j, ny) * nx + wrap(k, nz) * nx * ny;
-											f << permnew[l][ind] << " ";
+											if (permt == 0)
+												f << perm[l][ind] << " ";
+											else if (permt == 1)
+												f << permnew[l][ind] << " ";
+											else if (permt == 2)
+												f << sqrt(pow(perm[0][ind], 2) + pow(perm[1][ind], 2) + pow(perm[2][ind], 2));
 											nout++;
 											if (nout % 10 == 0)
 												f << std::endl;
@@ -971,11 +1004,11 @@ int main(int argc, char *argv[])
 			std::cout << "write PERM to VTK file" << std::endl;
 			if( vtu )
 			{
-				fvtk << "\t\t\t\t<DataArray Name=\"PERM\" NumberOfComponents=\"6\" type=\"Float64\" format=\"ascii\">" << std::endl;
+				fvtk << "\t\t\t\t<DataArray Name=\"PERM\" NumberOfComponents=\"" << nl[permt] << "\" type=\"Float64\" format=\"ascii\">" << std::endl;
 			}
 			else
 			{
-				fvtk << "SCALARS PERM double 6" << std::endl;
+				fvtk << "SCALARS PERM double " << nl[permt] << std::endl;
 				fvtk << "LOOKUP_TABLE default" << std::endl;
 			}
 			for(int k = 0; k < nz*nnz; ++k)
@@ -996,8 +1029,15 @@ int main(int argc, char *argv[])
 							if( wvtk == 2 ) cells = 6;
 							for(int q = 0; q < cells; ++q)
 							{
-								for(int l = 0; l < 6; ++l)
-									fvtk << permnew[l][ind] << " ";
+								for (int l = 0; l < nl[permt]; ++l)
+								{
+									if (permt == 0)
+										fvtk << perm[l][ind] << " ";
+									else if (permt == 1)
+										fvtk << permnew[l][ind] << " ";
+									else if (permt == 2)
+										fvtk << sqrt(pow(perm[0][ind], 2) + pow(perm[1][ind], 2) + pow(perm[2][ind], 2));
+								}
 								fvtk << std::endl;
 							}
 						}
